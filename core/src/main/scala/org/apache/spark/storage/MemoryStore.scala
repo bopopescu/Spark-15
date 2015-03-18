@@ -19,7 +19,8 @@ package org.apache.spark.storage
 
 import java.nio.ByteBuffer
 import java.util.LinkedHashMap
-
+import java.util.LinkedList
+import java.lang.System
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -37,6 +38,20 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   private val conf = blockManager.conf
   private val entries = new LinkedHashMap[BlockId, MemoryEntry](32, 0.75f, true)
+  
+  logInfo(s"*******************************************************")
+  logInfo(s"*******************************************************")
+  logInfo(s"*********                                   ***********")
+  logInfo(s"*********        creation of usage          ***********")
+  logInfo(s"*********                                   ***********")
+  logInfo(s"*******************************************************")
+  logInfo(s"*******************************************************")
+  //usage is used to contain the time when Block is inserted or used.
+  
+  private val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
+  // if(usage.get(blockId) == null)
+  //     usage.put(blockId, LinkedList<Long>)
+  // usage.get(blockId).add(System.currentTimeMillis())
 
   @volatile private var currentMemory = 0L
 
@@ -164,6 +179,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val entry = entries.synchronized {
       entries.get(blockId)
     }
+    if(usage.get(blockId) == null)
+      usage.put(blockId, new LinkedList[Long]())
+    usage.get(blockId).add(System.currentTimeMillis())
     if (entry == null) {
       None
     } else if (entry.deserialized) {
@@ -177,6 +195,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val entry = entries.synchronized {
       entries.get(blockId)
     }
+    if(usage.get(blockId) == null)
+      usage.put(blockId, new LinkedList[Long]())
+    usage.get(blockId).add(System.currentTimeMillis())
     if (entry == null) {
       None
     } else if (entry.deserialized) {
@@ -350,6 +371,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           entries.put(blockId, entry)
           currentMemory += size
         }
+        if(usage.get(blockId) == null)
+          usage.put(blockId, new LinkedList[Long]())
+        usage.get(blockId).add(System.currentTimeMillis())
         val valuesOrBytes = if (deserialized) "values" else "bytes"
         logInfo("Block %s stored as %s in memory (estimated size %s, free %s)".format(
           blockId, valuesOrBytes, Utils.bytesToString(size), Utils.bytesToString(freeMemory)))
@@ -399,8 +423,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val threadId = Thread.currentThread().getId
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
-
-    if (actualFreeMemory < space) {
+      
+      
+    //modification
+    
+      
+    //if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
@@ -409,8 +437,23 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       // (because of getValue or getBytes) while traversing the iterator, as that
       // can lead to exceptions.
       entries.synchronized {
-        val iterator = entries.entrySet().iterator()
-        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+        
+        //*************modifications here
+        //val iterator = entries.entrySet().iterator()
+        
+        logInfo(s"*******************************************************")
+        logInfo(s"*******************************************************")
+        logInfo(s"*********                                   ***********")
+        logInfo(s"*********      track for modifications      ***********")
+        logInfo(s"*********                                   ***********")
+        logInfo(s"*******************************************************")
+        logInfo(s"*******************************************************")
+        
+        val cmuEntries = entries.entrySet()
+        val iterator = cmuEntries.iterator()
+        
+        //while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+        while(iterator.hasNext) {
           val pair = iterator.next()
           val blockId = pair.getKey
           if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
@@ -418,7 +461,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
             selectedMemory += pair.getValue.size
           }
         }
-      }
+      //}
 
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
