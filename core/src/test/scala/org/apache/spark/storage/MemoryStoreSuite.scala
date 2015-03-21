@@ -64,9 +64,9 @@ class MemoryStoreSuite extends FunSuite with Matchers with BeforeAndAfterEach
     val a1 = testData(0, 0, 4000)
     memoryStore invokePrivate tryToPutValue(a1.blockId, a1.data, a1.size, false)
     assert(memoryStore.getSize(a1.blockId) == 4000, "a1 had unexpected size")
-    memoryStore.getBytes(a1.blockId)
-    memoryStore.getValues(a1.blockId)
-    //TODO: assert access count increases
+    assert(memoryStore.getBytes(a1.blockId) == Some(a1.data))
+    assert(memoryStore.getValues(a1.blockId) == Some(null)) //null due to blockmanager mock
+    //TODO: assert access count increases == 3
     pending
   }
 }
