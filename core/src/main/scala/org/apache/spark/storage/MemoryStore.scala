@@ -81,6 +81,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getSize(blockId: BlockId): Long = {
     entries.synchronized {
+      // TODO: record access time for blockId in data structure
       entries.get(blockId).size
     }
   }
@@ -162,6 +163,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     val entry = entries.synchronized {
+      // TODO: record access time for blockId in data structure
       entries.get(blockId)
     }
     if (entry == null) {
@@ -175,6 +177,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     val entry = entries.synchronized {
+      // TODO: record access time for blockId in data structure
       entries.get(blockId)
     }
     if (entry == null) {
@@ -189,6 +192,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def remove(blockId: BlockId): Boolean = {
     entries.synchronized {
+      // TODO: remove entry for blockId from data structure 
       val entry = entries.remove(blockId)
       if (entry != null) {
         currentMemory -= entry.size
@@ -202,6 +206,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def clear() {
     entries.synchronized {
+      // TODO: remove all entries from data structure
       entries.clear()
       currentMemory = 0
     }
@@ -347,6 +352,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (enoughFreeSpace) {
         val entry = new MemoryEntry(value, size, deserialized)
         entries.synchronized {
+          // TODO: record access time for blockId in data structure
           entries.put(blockId, entry)
           currentMemory += size
         }
@@ -423,6 +429,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
+          // TODO: record access time for blockId in data structure
           val entry = entries.synchronized { entries.get(blockId) }
           // This should never be null as only one thread should be dropping
           // blocks and removing entries. However the check is still here for
