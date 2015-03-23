@@ -19,6 +19,11 @@ package org.apache.spark.storage
 
 import java.nio.ByteBuffer
 import java.util.LinkedHashMap
+import java.util.{Date, Locale}
+import java.text.DateFormat
+import java.text.DateFormat._
+import java.text.SimpleDateFormat
+
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -82,6 +87,11 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getSize(blockId: BlockId): Long = {
     entries.synchronized {
       // TODO: record access time for blockId in data structure
+      val time = new Date
+      //val df = getDateInstance(LONG)
+      val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+      logInfo(s"************************ called in getSize ************************")
+      logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId).size
     }
   }
@@ -164,6 +174,11 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     val entry = entries.synchronized {
       // TODO: record access time for blockId in data structure
+      val time = new Date
+      //val df = getDateInstance(LONG)
+      val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+      logInfo(s"************************ called in getBytes ************************")
+      logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId)
     }
     if (entry == null) {
@@ -178,6 +193,11 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     val entry = entries.synchronized {
       // TODO: record access time for blockId in data structure
+      val time = new Date
+      //val df = getDateInstance(LONG)
+      val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+      logInfo(s"************************ called in getValues ************************")
+      logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId)
     }
     if (entry == null) {
@@ -353,6 +373,11 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         val entry = new MemoryEntry(value, size, deserialized)
         entries.synchronized {
           // TODO: record access time for blockId in data structure
+          val time = new Date
+          //val df = getDateInstance(LONG)
+          val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+          logInfo(s"************************ called in tryToPut ************************")
+          logInfo(s"************************ time is " + df.format(time) +" ************************")
           entries.put(blockId, entry)
           currentMemory += size
         }
@@ -375,6 +400,40 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       releasePendingUnrollMemoryForThisThread()
     }
     ResultWithDroppedBlocks(putSuccess, droppedBlocks)
+  }
+
+
+  /**
+  *Define the ways to choose which blcok to swap out
+  */
+  //question: the parameters passed in are val?
+  private def findBlocksToReplace (
+    entries: LinkedHashMap[BlockId, MemoryEntry],
+    actualFreeMemory: Long,
+    space: Long,
+    rddToAdd: Option[Int],
+    selectedBlocks: ArrayBuffer[BlockId],
+    selectedMemory: Long) : Long = {
+    val time = new Date
+    //val df = getDateInstance(LONG)
+    val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+    logInfo(s"************************ called in getReplacedBlocks ************************")
+    logInfo(s"************************ time is " + df.format(time) +" ************************")
+    var resultSelectedMemory = selectedMemory
+    entries.synchronized {
+      val iterator = entries.entrySet().iterator()
+      //while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+      while (iterator.hasNext) {
+        val pair = iterator.next()
+        val blockId = pair.getKey
+        if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
+          logInfo(s"########################## blockId is $blockId ##############")
+          selectedBlocks += blockId
+          resultSelectedMemory += pair.getValue.size
+        }
+      }
+    }
+    resultSelectedMemory
   }
 
   /**
@@ -406,7 +465,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
 
-    if (actualFreeMemory < space) {
+    //if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
@@ -414,22 +473,31 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       // This is synchronized to ensure that the set of entries is not changed
       // (because of getValue or getBytes) while traversing the iterator, as that
       // can lead to exceptions.
-      entries.synchronized {
-        val iterator = entries.entrySet().iterator()
-        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-          val pair = iterator.next()
-          val blockId = pair.getKey
-          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-            selectedBlocks += blockId
-            selectedMemory += pair.getValue.size
-          }
-        }
-      }
+      //************************** replaced by function begin **************************
+      // entries.synchronized {
+      //   val iterator = entries.entrySet().iterator()
+      //   while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+      //     val pair = iterator.next()
+      //     val blockId = pair.getKey
+      //     if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
+      //       selectedBlocks += blockId
+      //       selectedMemory += pair.getValue.size
+      //     }
+      //   }
+      // }
+      //************************** replaced by function end **************************
+
+      selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
 
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
           // TODO: record access time for blockId in data structure
+          val time = new Date
+          //val df = getDateInstance(LONG)
+          val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+          logInfo(s"************************ called in ensureFreeSpace ************************")
+          logInfo(s"************************ time is " + df.format(time) +" ************************")
           val entry = entries.synchronized { entries.get(blockId) }
           // This should never be null as only one thread should be dropping
           // blocks and removing entries. However the check is still here for
@@ -450,7 +518,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           "from the same RDD")
         return ResultWithDroppedBlocks(success = false, droppedBlocks)
       }
-    }
+    //}
     ResultWithDroppedBlocks(success = true, droppedBlocks)
   }
 
