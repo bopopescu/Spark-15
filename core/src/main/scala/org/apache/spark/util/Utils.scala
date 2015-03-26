@@ -403,7 +403,8 @@ private[spark] object Utils extends Logging {
       useCache: Boolean) {
     val fileName = url.split("/").last
     val targetFile = new File(targetDir, fileName)
-    if (useCache) {
+    val fetchCacheEnabled = conf.getBoolean("spark.files.useFetchCache", defaultValue = true)
+    if (useCache && fetchCacheEnabled) {
       val cachedFileName = s"${url.hashCode}${timestamp}_cache"
       val lockFileName = s"${url.hashCode}${timestamp}_lock"
       val localDir = new File(getLocalDir(conf))
@@ -624,7 +625,8 @@ private[spark] object Utils extends Logging {
       case _ =>
         val fs = getHadoopFileSystem(uri, hadoopConf)
         val path = new Path(uri)
-        fetchHcfsFile(path, new File(targetDir, path.getName), fs, conf, hadoopConf, fileOverwrite)
+        fetchHcfsFile(path, targetDir, fs, conf, hadoopConf, fileOverwrite,
+                      filename = Some(filename))
     }
   }
 
@@ -639,19 +641,22 @@ private[spark] object Utils extends Logging {
       fs: FileSystem,
       conf: SparkConf,
       hadoopConf: Configuration,
-      fileOverwrite: Boolean): Unit = {
-    if (!targetDir.mkdir()) {
+      fileOverwrite: Boolean,
+      filename: Option[String] = None): Unit = {
+    if (!targetDir.exists() && !targetDir.mkdir()) {
       throw new IOException(s"Failed to create directory ${targetDir.getPath}")
     }
-    fs.listStatus(path).foreach { fileStatus =>
-      val innerPath = fileStatus.getPath
-      if (fileStatus.isDir) {
-        fetchHcfsFile(innerPath, new File(targetDir, innerPath.getName), fs, conf, hadoopConf,
-          fileOverwrite)
-      } else {
-        val in = fs.open(innerPath)
-        val targetFile = new File(targetDir, innerPath.getName)
-        downloadFile(innerPath.toString, in, targetFile, fileOverwrite)
+    val dest = new File(targetDir, filename.getOrElse(path.getName))
+    if (fs.isFile(path)) {
+      val in = fs.open(path)
+      try {
+        downloadFile(path.toString, in, dest, fileOverwrite)
+      } finally {
+        in.close()
+      }
+    } else {
+      fs.listStatus(path).foreach { fileStatus =>
+        fetchHcfsFile(fileStatus.getPath(), dest, fs, conf, hadoopConf, fileOverwrite)
       }
     }
   }
