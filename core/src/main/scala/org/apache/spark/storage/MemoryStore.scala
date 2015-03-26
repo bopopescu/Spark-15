@@ -422,8 +422,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     var resultSelectedMemory = selectedMemory
     entries.synchronized {
       val iterator = entries.entrySet().iterator()
-      //while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-      while (iterator.hasNext) {
+      while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+      //while (iterator.hasNext) {
         val pair = iterator.next()
         val blockId = pair.getKey
         if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
@@ -465,7 +465,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
 
-    //if (actualFreeMemory < space) {
+    if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
@@ -518,7 +518,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           "from the same RDD")
         return ResultWithDroppedBlocks(success = false, droppedBlocks)
       }
-    //}
+    }
     ResultWithDroppedBlocks(success = true, droppedBlocks)
   }
 
