@@ -185,6 +185,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     if (entry == null) {
       None
     } else if (entry.deserialized) {
+//TODO: print out the ByteBuffer.
       Some(blockManager.dataSerialize(blockId, entry.value.asInstanceOf[Array[Any]].iterator))
     } else {
       Some(entry.value.asInstanceOf[ByteBuffer].duplicate()) // Doesn't actually copy the data
@@ -201,6 +202,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     if (entry == null) {
       None
     } else if (entry.deserialized) {
+//TODO: try to get more information about Iterator.
       Some(entry.value.asInstanceOf[Array[Any]].iterator)
     } else {
       val buffer = entry.value.asInstanceOf[ByteBuffer].duplicate() // Doesn't actually copy data
@@ -348,6 +350,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   private def tryToPut(
       blockId: BlockId,
       value: Any,
+/*TODO: deep research. print size. */
       size: Long,
       deserialized: Boolean): ResultWithDroppedBlocks = {
 
@@ -459,6 +462,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
             selectedBlocks += blockId
             selectedMemory += pair.getValue.size
+            logInfo(s"Block: " + String.valueOf(blockId)
+              + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
+              + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
           }
         }
       //}
@@ -466,6 +472,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
+          logInfo(s"dropping block: " + String.valueOf(blockId))
           val entry = entries.synchronized { entries.get(blockId) }
           // This should never be null as only one thread should be dropping
           // blocks and removing entries. However the check is still here for
