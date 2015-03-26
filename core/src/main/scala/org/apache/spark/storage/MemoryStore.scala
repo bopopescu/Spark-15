@@ -96,9 +96,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getSize(blockId: BlockId): Long = {
     entries.synchronized {
-      // TODO: record access time for blockId in data structure
       entries.get(blockId).size
     }
+    if(usage.get(blockId) == null)
+      usage.put(blockId, new LinkedList[Long]())
+    usage.get(blockId).add(System.currentTimeMillis())
+
   }
 
   override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
@@ -178,7 +181,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     val entry = entries.synchronized {
-      // TODO: record access time for blockId in data structure
       entries.get(blockId)
     }
     if(usage.get(blockId) == null)
@@ -196,7 +198,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     val entry = entries.synchronized {
-      // TODO: record access time for blockId in data structure
       entries.get(blockId)
     }
     if(usage.get(blockId) == null)
@@ -215,7 +216,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def remove(blockId: BlockId): Boolean = {
     entries.synchronized {
-      // TODO: remove entry for blockId from data structure 
       val entry = entries.remove(blockId)
       if (entry != null) {
         currentMemory -= entry.size
@@ -225,14 +225,15 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         false
       }
     }
+    usage.remove(blockId)
   }
 
   override def clear() {
     entries.synchronized {
-      // TODO: remove all entries from data structure
       entries.clear()
       currentMemory = 0
     }
+    usage.clear()
     logInfo("MemoryStore cleared")
   }
 
@@ -376,7 +377,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (enoughFreeSpace) {
         val entry = new MemoryEntry(value, size, deserialized)
         entries.synchronized {
-          // TODO: record access time for blockId in data structure
           entries.put(blockId, entry)
           currentMemory += size
         }
@@ -437,7 +437,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     //modification
     
       
-    //if (actualFreeMemory < space) {
+    if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
@@ -461,8 +461,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         val cmuEntries = entries.entrySet()
         val iterator = cmuEntries.iterator()
         
-        //while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-        while(iterator.hasNext) {
+        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
           val pair = iterator.next()
           val blockId = pair.getKey
           if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
@@ -473,14 +472,17 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
               + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
           }
         }
-      //}
+      }
 
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
-          // TODO: record access time for blockId in data structure
           val entry = entries.synchronized { entries.get(blockId) }
+          if(usage.get(blockId) == null)
+            usage.put(blockId, new LinkedList[Long]())
+          usage.get(blockId).add(System.currentTimeMillis())
+
           // This should never be null as only one thread should be dropping
           // blocks and removing entries. However the check is still here for
           // future safety.
