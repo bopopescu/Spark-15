@@ -19,11 +19,14 @@ package org.apache.spark.storage
 
 import java.nio.ByteBuffer
 import java.util.LinkedHashMap
+
 import java.util.{Date, Locale}
 import java.text.DateFormat
 import java.text.DateFormat._
 import java.text.SimpleDateFormat
 
+import java.util.LinkedList
+import java.lang.System
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -42,6 +45,20 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   private val conf = blockManager.conf
   private val entries = new LinkedHashMap[BlockId, MemoryEntry](32, 0.75f, true)
+  
+  logInfo(s"*******************************************************")
+  logInfo(s"*******************************************************")
+  logInfo(s"*********                                   ***********")
+  logInfo(s"*********        creation of usage          ***********")
+  logInfo(s"*********                                   ***********")
+  logInfo(s"*******************************************************")
+  logInfo(s"*******************************************************")
+  //usage is used to contain the time when Block is inserted or used.
+  
+  private val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
+  // if(usage.get(blockId) == null)
+  //     usage.put(blockId, LinkedList<Long>)
+  // usage.get(blockId).add(System.currentTimeMillis())
 
   @volatile private var currentMemory = 0L
 
@@ -181,9 +198,13 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId)
     }
+    if(usage.get(blockId) == null)
+      usage.put(blockId, new LinkedList[Long]())
+    usage.get(blockId).add(System.currentTimeMillis())
     if (entry == null) {
       None
     } else if (entry.deserialized) {
+//TODO: print out the ByteBuffer.
       Some(blockManager.dataSerialize(blockId, entry.value.asInstanceOf[Array[Any]].iterator))
     } else {
       Some(entry.value.asInstanceOf[ByteBuffer].duplicate()) // Doesn't actually copy the data
@@ -200,9 +221,13 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId)
     }
+    if(usage.get(blockId) == null)
+      usage.put(blockId, new LinkedList[Long]())
+    usage.get(blockId).add(System.currentTimeMillis())
     if (entry == null) {
       None
     } else if (entry.deserialized) {
+//TODO: try to get more information about Iterator.
       Some(entry.value.asInstanceOf[Array[Any]].iterator)
     } else {
       val buffer = entry.value.asInstanceOf[ByteBuffer].duplicate() // Doesn't actually copy data
@@ -352,6 +377,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   private def tryToPut(
       blockId: BlockId,
       value: Any,
+/*TODO: deep research. print size. */
       size: Long,
       deserialized: Boolean): ResultWithDroppedBlocks = {
 
@@ -381,6 +407,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           entries.put(blockId, entry)
           currentMemory += size
         }
+        if(usage.get(blockId) == null)
+          usage.put(blockId, new LinkedList[Long]())
+        usage.get(blockId).add(System.currentTimeMillis())
         val valuesOrBytes = if (deserialized) "values" else "bytes"
         logInfo("Block %s stored as %s in memory (estimated size %s, free %s)".format(
           blockId, valuesOrBytes, Utils.bytesToString(size), Utils.bytesToString(freeMemory)))
@@ -464,8 +493,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val threadId = Thread.currentThread().getId
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
-
-    if (actualFreeMemory < space) {
+      
+      
+    //modification
+    
+      
+    //if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
@@ -473,6 +506,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       // This is synchronized to ensure that the set of entries is not changed
       // (because of getValue or getBytes) while traversing the iterator, as that
       // can lead to exceptions.
+<<<<<<< HEAD
       //************************** replaced by function begin **************************
       // entries.synchronized {
       //   val iterator = entries.entrySet().iterator()
@@ -488,10 +522,42 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       //************************** replaced by function end **************************
 
       selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+=======
+      entries.synchronized {
+        
+        //*************modifications here
+        //val iterator = entries.entrySet().iterator()
+        
+        logInfo(s"*******************************************************")
+        logInfo(s"*******************************************************")
+        logInfo(s"*********                                   ***********")
+        logInfo(s"*********      track for modifications      ***********")
+        logInfo(s"*********                                   ***********")
+        logInfo(s"*******************************************************")
+        logInfo(s"*******************************************************")
+        
+        val cmuEntries = entries.entrySet()
+        val iterator = cmuEntries.iterator()
+        
+        //while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+        while(iterator.hasNext) {
+          val pair = iterator.next()
+          val blockId = pair.getKey
+          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
+            selectedBlocks += blockId
+            selectedMemory += pair.getValue.size
+            logInfo(s"Block: " + String.valueOf(blockId)
+              + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
+              + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
+          }
+        }
+      //}
+>>>>>>> 3ac51e5a162b2d6a2caf273eb83b68ed76c6401d
 
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
+          logInfo(s"dropping block: " + String.valueOf(blockId))
           // TODO: record access time for blockId in data structure
           val time = new Date
           //val df = getDateInstance(LONG)
