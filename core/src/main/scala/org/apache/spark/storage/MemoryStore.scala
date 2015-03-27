@@ -55,7 +55,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   logInfo(s"*******************************************************")
   //usage is used to contain the time when Block is inserted or used.
   
-  private val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
+  private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
   // if(usage.get(blockId) == null)
   //     usage.put(blockId, LinkedList<Long>)
   // usage.get(blockId).add(System.currentTimeMillis())
