@@ -56,7 +56,10 @@ class MemoryStoreSuite extends FunSuite with Matchers with BeforeAndAfterEach
     memoryStore invokePrivate tryToPutValue(a2.blockId, a2.data, a2.size, false)
     assert(memoryStore.contains(a1.blockId), "a1 was not in memory store")
     assert(memoryStore.contains(a2.blockId), "a2 was not in memory store")
-    //TODO: assert that our data structure contains a1 and a2
+    assert(memoryStore.usage.containsKey(a1.blockId), "a1 was not in usage")
+    assert(memoryStore.usage.get(a1.blockId).size == 1, "a1 has invalid access count")
+    assert(memoryStore.usage.containsKey(a2.blockId), "a2 was not in usage")
+    assert(memoryStore.usage.get(a2.blockId).size == 1, "a2 has invalid access count")    
   }
 
   test("each access should increase the access count in our data structure") {
@@ -65,6 +68,14 @@ class MemoryStoreSuite extends FunSuite with Matchers with BeforeAndAfterEach
     assert(memoryStore.getSize(a1.blockId) == 4000, "a1 had unexpected size")
     assert(memoryStore.getBytes(a1.blockId) == Some(a1.data))
     assert(memoryStore.getValues(a1.blockId) == Some(null)) //null due to blockmanager mock
-    //TODO: assert access count increases == 3
+    assert(memoryStore.usage.get(a1.blockId).size == 4)
+  }
+
+  test("remove") {
+    val a1 = testData(0, 0, 4000)    
+    memoryStore invokePrivate tryToPutValue(a1.blockId, a1.data, a1.size, false)    
+    assert(memoryStore.usage.containsKey(a1.blockId), "a1 not in usage store")
+    memoryStore.remove(a1.blockId)
+    assert(!memoryStore.usage.containsKey(a1.blockId), "a1 in usage store")
   }
 }

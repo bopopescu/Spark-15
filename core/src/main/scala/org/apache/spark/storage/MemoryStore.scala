@@ -55,7 +55,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   logInfo(s"*******************************************************")
   //usage is used to contain the time when Block is inserted or used.
   
-  private val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
+  private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
   // if(usage.get(blockId) == null)
   //     usage.put(blockId, LinkedList<Long>)
   // usage.get(blockId).add(System.currentTimeMillis())
@@ -103,6 +103,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getSize(blockId: BlockId): Long = {
     entries.synchronized {
+      // TODO: record access time for blockId in data structure
       val time = new Date
       //val df = getDateInstance(LONG)
       val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
@@ -192,6 +193,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     val entry = entries.synchronized {
+      // TODO: record access time for blockId in data structure
       val time = new Date
       //val df = getDateInstance(LONG)
       val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
@@ -214,6 +216,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     val entry = entries.synchronized {
+      // TODO: record access time for blockId in data structure
       val time = new Date
       //val df = getDateInstance(LONG)
       val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
@@ -398,6 +401,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (enoughFreeSpace) {
         val entry = new MemoryEntry(value, size, deserialized)
         entries.synchronized {
+          // TODO: record access time for blockId in data structure
           val time = new Date
           //val df = getDateInstance(LONG)
           val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
@@ -553,6 +557,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
+          // TODO: record access time for blockId in data structure
           val time = new Date
           //val df = getDateInstance(LONG)
           val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
