@@ -57,7 +57,6 @@ class MemoryStoreSuite extends FunSuite with Matchers with BeforeAndAfterEach
     assert(memoryStore.contains(a1.blockId), "a1 was not in memory store")
     assert(memoryStore.contains(a2.blockId), "a2 was not in memory store")
     //TODO: assert that our data structure contains a1 and a2
-    pending
   }
 
   test("each access should increase the access count in our data structure") {
@@ -67,6 +66,5 @@ class MemoryStoreSuite extends FunSuite with Matchers with BeforeAndAfterEach
     assert(memoryStore.getBytes(a1.blockId) == Some(a1.data))
     assert(memoryStore.getValues(a1.blockId) == Some(null)) //null due to blockmanager mock
     //TODO: assert access count increases == 3
-    pending
   }
 }
