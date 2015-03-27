@@ -70,4 +70,12 @@ class MemoryStoreSuite extends FunSuite with Matchers with BeforeAndAfterEach
     assert(memoryStore.getValues(a1.blockId) == Some(null)) //null due to blockmanager mock
     assert(memoryStore.usage.get(a1.blockId).size == 4)
   }
+
+  test("remove") {
+    val a1 = testData(0, 0, 4000)    
+    memoryStore invokePrivate tryToPutValue(a1.blockId, a1.data, a1.size, false)    
+    assert(memoryStore.usage.containsKey(a1.blockId), "a1 not in usage store")
+    memoryStore.remove(a1.blockId)
+    assert(!memoryStore.usage.containsKey(a1.blockId), "a1 in usage store")
+  }
 }
