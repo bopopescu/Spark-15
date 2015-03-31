@@ -107,6 +107,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     if(usage.get(blockId) == null)
       usage.put(blockId, new LinkedList[Long]())
     usage.get(blockId).add(System.currentTimeMillis())
+    entries.get(blockId).size
   }
 
   override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
@@ -231,17 +232,17 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (entry != null) {
         currentMemory -= entry.size
         logDebug(s"Block $blockId of size ${entry.size} dropped from memory (free $freeMemory)")
-        true
-      } else {
-        false
       }
     }
     // remove blockId in data structure
     logInfo(s"CMU - Usage data structure update. " +
             "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()))
-    if(usage.get(blockId) == null)
+    if(usage.get(blockId) != null) {
       usage.remove(blockId)
-    usage.get(blockId).add(System.currentTimeMillis())
+      true
+    } else {
+      false
+    }
   }
 
   override def clear() {
@@ -443,20 +444,44 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     rddToAdd: Option[Int],
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
-    val time = new Date
-    //val df = getDateInstance(LONG)
-    val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-    logInfo(s"************************ called in getReplacedBlocks ************************")
-    logInfo(s"************************ time is " + df.format(time) +" ************************")
     var resultSelectedMemory = selectedMemory
     entries.synchronized {
-      val iterator = entries.entrySet().iterator()
+      val cmuEntries = entries.entrySet()
+      val iterator = cmuEntries.iterator()
       while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-      //while (iterator.hasNext) {
         val pair = iterator.next()
         val blockId = pair.getKey
         if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
           logInfo(s"########################## blockId is $blockId ##############")
+          selectedBlocks += blockId
+          resultSelectedMemory += pair.getValue.size
+          logInfo(s"Block: " + String.valueOf(blockId)
+              + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
+              + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
+        }
+      }
+    }
+    resultSelectedMemory
+  }
+  
+  
+  private def findBlocksToReplaceOriginal (
+    entries: LinkedHashMap[BlockId, MemoryEntry],
+    actualFreeMemory: Long,
+    space: Long,
+    rddToAdd: Option[Int],
+    selectedBlocks: ArrayBuffer[BlockId],
+    selectedMemory: Long) : Long = {
+  // This is synchronized to ensure that the set of entries is not changed
+  // (because of getValue or getBytes) while traversing the iterator, as that
+  // can lead to exceptions.
+    var resultSelectedMemory = selectedMemory
+    entries.synchronized {
+      val iterator = entries.entrySet().iterator()
+      while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+        val pair = iterator.next()
+        val blockId = pair.getKey
+        if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
           selectedBlocks += blockId
           resultSelectedMemory += pair.getValue.size
         }
@@ -499,52 +524,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
 
-      // This is synchronized to ensure that the set of entries is not changed
-      // (because of getValue or getBytes) while traversing the iterator, as that
-      // can lead to exceptions.
-      //************************** replaced by function begin **************************
-      // entries.synchronized {
-      //   val iterator = entries.entrySet().iterator()
-      //   while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-      //     val pair = iterator.next()
-      //     val blockId = pair.getKey
-      //     if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-      //       selectedBlocks += blockId
-      //       selectedMemory += pair.getValue.size
-      //     }
-      //   }
-      // }
-      //************************** replaced by function end **************************
-
       selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-      entries.synchronized {
-        
-        //*************modifications here
-        //val iterator = entries.entrySet().iterator()
-        
-        logInfo(s"*******************************************************")
-        logInfo(s"*******************************************************")
-        logInfo(s"*********                                   ***********")
-        logInfo(s"*********      track for modifications      ***********")
-        logInfo(s"*********                                   ***********")
-        logInfo(s"*******************************************************")
-        logInfo(s"*******************************************************")
-        
-        val cmuEntries = entries.entrySet()
-        val iterator = cmuEntries.iterator()
-        
-        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-          val pair = iterator.next()
-          val blockId = pair.getKey
-          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-            selectedBlocks += blockId
-            selectedMemory += pair.getValue.size
-            logInfo(s"Block: " + String.valueOf(blockId)
-              + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
-              + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
-          }
-        }
-      }
 
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
