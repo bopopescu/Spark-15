@@ -102,6 +102,11 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       entries.get(blockId).size
     }
     // record access time for blockId in data structure
+    logInfo(s"CMU - Usage data structure updated with new time entry. " +
+            "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
+    if(usage.get(blockId) == null)
+      usage.put(blockId, new LinkedList[Long]())
+    usage.get(blockId).add(System.currentTimeMillis())
   }
 
   override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
@@ -183,6 +188,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val entry = entries.synchronized {
       entries.get(blockId)
     }
+    // record access time for blockId in data structure
+    logInfo(s"CMU - Usage data structure updated with new time entry. " +
+            "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
     if(usage.get(blockId) == null)
       usage.put(blockId, new LinkedList[Long]())
     usage.get(blockId).add(System.currentTimeMillis())
@@ -200,6 +208,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val entry = entries.synchronized {
       entries.get(blockId)
     }
+    // record access time for blockId in data structure
+    logInfo(s"CMU - Usage data structure updated with new time entry. " +
+            "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
     if(usage.get(blockId) == null)
       usage.put(blockId, new LinkedList[Long]())
     usage.get(blockId).add(System.currentTimeMillis())
@@ -225,6 +236,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         false
       }
     }
+    // remove blockId in data structure
+    logInfo(s"CMU - Usage data structure update. " +
+            "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()))
+    if(usage.get(blockId) == null)
+      usage.remove(blockId)
+    usage.get(blockId).add(System.currentTimeMillis())
   }
 
   override def clear() {
@@ -232,6 +249,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       entries.clear()
       currentMemory = 0
     }
+    // remove data structure
+    logInfo(s"CMU - Usage data structure cleared. ")
     usage.clear()
     logInfo("MemoryStore cleared")
   }
@@ -385,6 +404,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           entries.put(blockId, entry)
           currentMemory += size
         }
+        // record access time for blockId in data structure
+        logInfo(s"CMU - Usage data structure updated with new time entry. " +
+                "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
         if(usage.get(blockId) == null)
           usage.put(blockId, new LinkedList[Long]())
         usage.get(blockId).add(System.currentTimeMillis())
@@ -472,10 +494,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
       
-      
-    //modification
-    
-      
     if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
@@ -533,6 +551,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
           val entry = entries.synchronized { entries.get(blockId) }
+          // record access time for blockId in data structure
+          logInfo(s"CMU - Usage data structure updated with new time entry. " +
+                  "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
           if(usage.get(blockId) == null)
             usage.put(blockId, new LinkedList[Long]())
           usage.get(blockId).add(System.currentTimeMillis())
