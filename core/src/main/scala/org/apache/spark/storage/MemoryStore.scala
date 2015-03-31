@@ -54,11 +54,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   logInfo(s"*******************************************************")
   logInfo(s"*******************************************************")
   //usage is used to contain the time when Block is inserted or used.
-  
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
-  // if(usage.get(blockId) == null)
-  //     usage.put(blockId, LinkedList<Long>)
-  // usage.get(blockId).add(System.currentTimeMillis())
 
   @volatile private var currentMemory = 0L
 
@@ -103,17 +99,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getSize(blockId: BlockId): Long = {
     entries.synchronized {
-      // TODO: record access time for blockId in data structure
-      val time = new Date
-      //val df = getDateInstance(LONG)
-      val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-      logInfo(s"************************ called in getSize ************************")
-      logInfo(s"************************ time is " + df.format(time) +" ************************")
-      if(usage.get(blockId) == null)
-        usage.put(blockId, new LinkedList[Long]())
-      usage.get(blockId).add(System.currentTimeMillis())
       entries.get(blockId).size
     }
+    // record access time for blockId in data structure
   }
 
   override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
@@ -193,12 +181,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     val entry = entries.synchronized {
-      // TODO: record access time for blockId in data structure
-      val time = new Date
-      //val df = getDateInstance(LONG)
-      val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-      logInfo(s"************************ called in getBytes ************************")
-      logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId)
     }
     if(usage.get(blockId) == null)
@@ -216,12 +198,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     val entry = entries.synchronized {
-      // TODO: record access time for blockId in data structure
-      val time = new Date
-      //val df = getDateInstance(LONG)
-      val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-      logInfo(s"************************ called in getValues ************************")
-      logInfo(s"************************ time is " + df.format(time) +" ************************")
       entries.get(blockId)
     }
     if(usage.get(blockId) == null)
@@ -244,7 +220,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if (entry != null) {
         currentMemory -= entry.size
         logDebug(s"Block $blockId of size ${entry.size} dropped from memory (free $freeMemory)")
-        usage.remove(blockId)
         true
       } else {
         false
@@ -557,12 +532,6 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
-          // TODO: record access time for blockId in data structure
-          val time = new Date
-          //val df = getDateInstance(LONG)
-          val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-          logInfo(s"************************ called in ensureFreeSpace ************************")
-          logInfo(s"************************ time is " + df.format(time) +" ************************")
           val entry = entries.synchronized { entries.get(blockId) }
           if(usage.get(blockId) == null)
             usage.put(blockId, new LinkedList[Long]())
