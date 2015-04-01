@@ -98,16 +98,18 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   def freeMemory: Long = maxMemory - currentMemory
 
   override def getSize(blockId: BlockId): Long = {
-    entries.synchronized {
+    synchronized {
+      entries.synchronized {
+        entries.get(blockId).size
+      }
+      // record access time for blockId in data structure
+      logInfo(s"CMU - Usage data structure updated with new time entry. " +
+              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
+      if(usage.get(blockId) == null)
+        usage.put(blockId, new LinkedList[Long]())
+      usage.get(blockId).add(System.currentTimeMillis())
       entries.get(blockId).size
     }
-    // record access time for blockId in data structure
-    logInfo(s"CMU - Usage data structure updated with new time entry. " +
-            "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-    if(usage.get(blockId) == null)
-      usage.put(blockId, new LinkedList[Long]())
-    usage.get(blockId).add(System.currentTimeMillis())
-    entries.get(blockId).size
   }
 
   override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
@@ -186,74 +188,82 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   }
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
-    val entry = entries.synchronized {
-      entries.get(blockId)
-    }
-    // record access time for blockId in data structure
-    logInfo(s"CMU - Usage data structure updated with new time entry. " +
-            "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-    if(usage.get(blockId) == null)
-      usage.put(blockId, new LinkedList[Long]())
-    usage.get(blockId).add(System.currentTimeMillis())
-    if (entry == null) {
-      None
-    } else if (entry.deserialized) {
-//TODO: print out the ByteBuffer.
-      Some(blockManager.dataSerialize(blockId, entry.value.asInstanceOf[Array[Any]].iterator))
-    } else {
-      Some(entry.value.asInstanceOf[ByteBuffer].duplicate()) // Doesn't actually copy the data
+    synchronized {
+      val entry = entries.synchronized {
+        entries.get(blockId)
+      }
+      // record access time for blockId in data structure
+      logInfo(s"CMU - Usage data structure updated with new time entry. " +
+              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
+      if(usage.get(blockId) == null)
+        usage.put(blockId, new LinkedList[Long]())
+      usage.get(blockId).add(System.currentTimeMillis())
+      if (entry == null) {
+        None
+      } else if (entry.deserialized) {
+        //TODO: print out the ByteBuffer.
+        Some(blockManager.dataSerialize(blockId, entry.value.asInstanceOf[Array[Any]].iterator))
+      } else {
+        Some(entry.value.asInstanceOf[ByteBuffer].duplicate()) // Doesn't actually copy the data
+      }
     }
   }
 
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
-    val entry = entries.synchronized {
-      entries.get(blockId)
-    }
-    // record access time for blockId in data structure
-    logInfo(s"CMU - Usage data structure updated with new time entry. " +
-            "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-    if(usage.get(blockId) == null)
-      usage.put(blockId, new LinkedList[Long]())
-    usage.get(blockId).add(System.currentTimeMillis())
-    if (entry == null) {
-      None
-    } else if (entry.deserialized) {
-//TODO: try to get more information about Iterator.
-      Some(entry.value.asInstanceOf[Array[Any]].iterator)
-    } else {
-      val buffer = entry.value.asInstanceOf[ByteBuffer].duplicate() // Doesn't actually copy data
-      Some(blockManager.dataDeserialize(blockId, buffer))
+    synchronized {
+      val entry = entries.synchronized {
+        entries.get(blockId)
+      }
+      // record access time for blockId in data structure
+      logInfo(s"CMU - Usage data structure updated with new time entry. " +
+              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
+      if(usage.get(blockId) == null)
+        usage.put(blockId, new LinkedList[Long]())
+      usage.get(blockId).add(System.currentTimeMillis())
+      if (entry == null) {
+        None
+      } else if (entry.deserialized) {
+        //TODO: try to get more information about Iterator.
+        Some(entry.value.asInstanceOf[Array[Any]].iterator)
+      } else {
+        val buffer = entry.value.asInstanceOf[ByteBuffer].duplicate() // Doesn't actually copy data
+        Some(blockManager.dataDeserialize(blockId, buffer))
+      }
     }
   }
 
   override def remove(blockId: BlockId): Boolean = {
-    entries.synchronized {
-      val entry = entries.remove(blockId)
-      if (entry != null) {
-        currentMemory -= entry.size
-        logDebug(s"Block $blockId of size ${entry.size} dropped from memory (free $freeMemory)")
+    synchronized {
+      entries.synchronized {
+        val entry = entries.remove(blockId)
+        if (entry != null) {
+          currentMemory -= entry.size
+          logDebug(s"Block $blockId of size ${entry.size} dropped from memory (free $freeMemory)")
+        }
       }
-    }
-    // remove blockId in data structure
-    logInfo(s"CMU - Usage data structure update. " +
-            "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()))
-    if(usage.get(blockId) != null) {
-      usage.remove(blockId)
-      true
-    } else {
-      false
+      // remove blockId in data structure
+      logInfo(s"CMU - Usage data structure update. " +
+              "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()))
+      if(usage.get(blockId) != null) {
+        usage.remove(blockId)
+        true
+      } else {
+        false
+      }
     }
   }
 
   override def clear() {
-    entries.synchronized {
-      entries.clear()
-      currentMemory = 0
+    synchronized {
+      entries.synchronized {
+        entries.clear()
+        currentMemory = 0
+      }
+      // remove data structure
+      logInfo(s"CMU - Usage data structure cleared. ")
+      usage.clear()
+      logInfo("MemoryStore cleared")
     }
-    // remove data structure
-    logInfo(s"CMU - Usage data structure cleared. ")
-    usage.clear()
-    logInfo("MemoryStore cleared")
   }
 
   /**
@@ -395,22 +405,18 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
       if (enoughFreeSpace) {
         val entry = new MemoryEntry(value, size, deserialized)
-        entries.synchronized {
-          // TODO: record access time for blockId in data structure
-          val time = new Date
-          //val df = getDateInstance(LONG)
-          val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-          logInfo(s"************************ called in tryToPut ************************")
-          logInfo(s"************************ time is " + df.format(time) +" ************************")
-          entries.put(blockId, entry)
-          currentMemory += size
+        synchronized {
+          entries.synchronized {
+            entries.put(blockId, entry)
+            currentMemory += size
+          }
+          // record access time for blockId in data structure
+          logInfo(s"CMU - Usage data structure updated with new time entry. " +
+                  "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
+          if(usage.get(blockId) == null)
+            usage.put(blockId, new LinkedList[Long]())
+          usage.get(blockId).add(System.currentTimeMillis())
         }
-        // record access time for blockId in data structure
-        logInfo(s"CMU - Usage data structure updated with new time entry. " +
-                "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-        if(usage.get(blockId) == null)
-          usage.put(blockId, new LinkedList[Long]())
-        usage.get(blockId).add(System.currentTimeMillis())
         val valuesOrBytes = if (deserialized) "values" else "bytes"
         logInfo("Block %s stored as %s in memory (estimated size %s, free %s)".format(
           blockId, valuesOrBytes, Utils.bytesToString(size), Utils.bytesToString(freeMemory)))
@@ -445,21 +451,24 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
     var resultSelectedMemory = selectedMemory
-    entries.synchronized {
-      val cmuEntries = entries.entrySet()
-      val iterator = cmuEntries.iterator()
-      while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-        val pair = iterator.next()
-        val blockId = pair.getKey
-        if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-          logInfo(s"########################## blockId is $blockId ##############")
-          selectedBlocks += blockId
-          resultSelectedMemory += pair.getValue.size
-          logInfo(s"Block: " + String.valueOf(blockId)
-              + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
-              + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
+    synchronized {
+      entries.synchronized {
+        val cmuEntries = entries.entrySet()
+        val iterator = cmuEntries.iterator()
+        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+          val pair = iterator.next()
+          val blockId = pair.getKey
+          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
+            logInfo(s"########################## blockId is $blockId ##############")
+            selectedBlocks += blockId
+            resultSelectedMemory += pair.getValue.size
+            logInfo(s"Block: " + String.valueOf(blockId)
+                + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
+                + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
+          }
         }
       }
+    // TODO: utilize usage structure
     }
     resultSelectedMemory
   }
@@ -530,25 +539,27 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
-          val entry = entries.synchronized { entries.get(blockId) }
-          // record access time for blockId in data structure
-          logInfo(s"CMU - Usage data structure updated with new time entry. " +
-                  "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-          if(usage.get(blockId) == null)
-            usage.put(blockId, new LinkedList[Long]())
-          usage.get(blockId).add(System.currentTimeMillis())
-
-          // This should never be null as only one thread should be dropping
-          // blocks and removing entries. However the check is still here for
-          // future safety.
-          if (entry != null) {
-            val data = if (entry.deserialized) {
-              Left(entry.value.asInstanceOf[Array[Any]])
-            } else {
-              Right(entry.value.asInstanceOf[ByteBuffer].duplicate())
+          synchronized {
+            val entry = entries.synchronized { entries.get(blockId) }
+            // record access time for blockId in data structure
+            logInfo(s"CMU - Usage data structure updated with new time entry. " +
+                    "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
+            if(usage.get(blockId) == null)
+              usage.put(blockId, new LinkedList[Long]())
+            usage.get(blockId).add(System.currentTimeMillis())
+  
+            // This should never be null as only one thread should be dropping
+            // blocks and removing entries. However the check is still here for
+            // future safety.
+            if (entry != null) {
+              val data = if (entry.deserialized) {
+                Left(entry.value.asInstanceOf[Array[Any]])
+              } else {
+                Right(entry.value.asInstanceOf[ByteBuffer].duplicate())
+              }
+              val droppedBlockStatus = blockManager.dropFromMemory(blockId, data)
+              droppedBlockStatus.foreach { status => droppedBlocks += ((blockId, status)) }
             }
-            val droppedBlockStatus = blockManager.dropFromMemory(blockId, data)
-            droppedBlockStatus.foreach { status => droppedBlocks += ((blockId, status)) }
           }
         }
         return ResultWithDroppedBlocks(success = true, droppedBlocks)
