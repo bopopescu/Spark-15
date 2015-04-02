@@ -34,6 +34,8 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.util.{SizeEstimator, Utils}
 import org.apache.spark.util.collection.SizeTrackingVector
 
+import NaiveBayes._
+
 private case class MemoryEntry(value: Any, size: Long, deserialized: Boolean)
 
 /**
