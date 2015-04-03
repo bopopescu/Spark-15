@@ -25,8 +25,9 @@ import java.text.DateFormat
 import java.text.DateFormat._
 import java.text.SimpleDateFormat
 
-import java.util.LinkedList
+import java.util.LinkedList\
 import java.lang.System
+import java.io._
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -49,7 +50,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   private val entries = new LinkedHashMap[BlockId, MemoryEntry](32, 0.75f, true)
   
   logInfo(s"*******************************************************")
-  logInfo(s"*******************************************************")
+  logInfo(s"*******************************************************")   
   logInfo(s"*********                                   ***********")
   logInfo(s"*********        creation of usage          ***********")
   logInfo(s"*********                                   ***********")
@@ -666,6 +667,23 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       s"Storage limit = ${Utils.bytesToString(maxMemory)}."
     )
   }
+
+  /**
+   * generate the csv file of usage info for naive bayesian training.
+   */
+  // def writeUsageInfo() {
+  //   logInfo(s"CMU - Usage information written to csv file ")
+  //   val iterator = usage.entrySet().iterator()
+  //   var str = ""
+  //   while (iterator.hasNext) {
+  //     val pair = iterator.next()
+  //     val blockId = pair.getKey
+  //     val freq = pair.getValue.size
+  //     str = str + blockId + "," + freq + ","
+  //   }
+    
+  // }
+
 
   /**
    * Log a warning for failing to unroll a block.
