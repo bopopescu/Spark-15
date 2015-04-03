@@ -30,7 +30,7 @@ object InteractiveWorkloadTest {
     threads.foreach(_.start)
     threads.foreach(_.join)
     threads.foreach { wl =>
-      println(s"pi is approximately: $wl.pi")
+      println(s"pi is approximately: ${wl.pi}")
     }
 
     spark.stop()
