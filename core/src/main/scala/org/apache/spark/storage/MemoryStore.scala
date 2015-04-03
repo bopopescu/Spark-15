@@ -37,6 +37,8 @@ import org.apache.spark.util.collection.SizeTrackingVector
 
 import NaiveBayes._
 
+import java.io.PrintWriter
+
 private case class MemoryEntry(value: Any, size: Long, deserialized: Boolean)
 
 /**
@@ -60,7 +62,17 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
 
   @volatile private var currentMemory = 0L
+  
+  //create the bayse classifier.
+  // for (String path : dataPaths) {
+  val dataset = new DataSet("segment.data")
 
+  val eva = new Evaluation(dataset, "NaiveBayes")
+  val test = eva.crossValidation(2);
+  // val testonly = Array(4000.0)
+  // val prediction = test.predict(testonly)
+  // print mean and standard deviation of accuracy
+  // System.out.println("Dataset:" + path + ", mean and standard deviation of accuracy:" + eva.getAccMean() + "," + eva.getAccStd());
   // Ensure only one thread is putting, and if necessary, dropping blocks at any given time
   private val accountingLock = new Object
 
@@ -471,7 +483,35 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           }
         }
       }
+      logInfo(s"----------------------------test for bayse------------------------")
+      var usageEntries = usage.entrySet()
+      var usageIterator = usageEntries.iterator()
+      if(usageIterator.hasNext) {
+        var usagePair = usageIterator.next()
+        var usageBlockId = usagePair.getKey
+        var predict = test.predict(Array(usage.get(usageBlockId).size()))
+        logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
+          + s" predict:" + String.valueOf(predict))
+        while(usageIterator.hasNext) {
+          usagePair = usageIterator.next()
+          var usageTempBlockId = usagePair.getKey
+          var tempPredict = test.predict(Array(usage.get(usageTempBlockId).size()))
+          logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
+          + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
+          + s" predict:" + String.valueOf(tempPredict))
+          if(predict > tempPredict) {
+            predict = tempPredict
+            usageBlockId = usageTempBlockId
+          }
+        }
+        logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
+          + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
+      }
+      logInfo(s"----------------------------test end------------------------")
     // TODO: utilize usage structure
+    
     }
     resultSelectedMemory
   }
@@ -530,8 +570,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val threadId = Thread.currentThread().getId
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
-      
-    if (actualFreeMemory < space) {
+
+    //if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
@@ -571,7 +611,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           "from the same RDD")
         return ResultWithDroppedBlocks(success = false, droppedBlocks)
       }
-    }
+    //}
     ResultWithDroppedBlocks(success = true, droppedBlocks)
   }
 
