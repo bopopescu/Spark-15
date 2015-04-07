@@ -68,7 +68,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   val dataset = new DataSet("segment.data")
 
   val eva = new Evaluation(dataset, "NaiveBayes")
-  val test = eva.crossValidation();
+  val test = eva.crossValidation(2);
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
   // print mean and standard deviation of accuracy
