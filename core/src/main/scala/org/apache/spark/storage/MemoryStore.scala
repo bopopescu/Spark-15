@@ -25,7 +25,7 @@ import java.text.DateFormat
 import java.text.DateFormat._
 import java.text.SimpleDateFormat
 
-import java.util.LinkedList\
+import java.util.LinkedList
 import java.lang.System
 import java.io._
 
@@ -68,7 +68,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   val dataset = new DataSet("segment.data")
 
   val eva = new Evaluation(dataset, "NaiveBayes")
-  val test = eva.crossValidation(2);
+  val test = eva.crossValidation();
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
   // print mean and standard deviation of accuracy
@@ -711,18 +711,20 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   /**
    * generate the csv file of usage info for naive bayesian training.
    */
-  // def writeUsageInfo() {
-  //   logInfo(s"CMU - Usage information written to csv file ")
-  //   val iterator = usage.entrySet().iterator()
-  //   var str = ""
-  //   while (iterator.hasNext) {
-  //     val pair = iterator.next()
-  //     val blockId = pair.getKey
-  //     val freq = pair.getValue.size
-  //     str = str + blockId + "," + freq + ","
-  //   }
-    
-  // }
+  def writeUsageInfo() {
+    logInfo(s"CMU - Usage information written to csv file ")
+    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.txt", true)))
+    val iterator = usage.entrySet().iterator()
+    while (iterator.hasNext) {
+      var str = ""
+      val pair = iterator.next()
+      val blockId = pair.getKey
+      val freq = pair.getValue.size
+      str = str + blockId + "," + freq + ",\n"
+      out.write(str)
+    }
+    out.close()
+  }
 
 
   /**
