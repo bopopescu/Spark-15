@@ -17,30 +17,33 @@ object InteractiveWorkloadTest {
   final val MIN_WAIT_TIME = 1000
   final val MAX_WAIT_TIME = 10000
 
-  class Workload(_spark:SparkContext) extends Thread with PiApproximation {
+  class Workload(_spark:SparkContext, maxWaitTime:Int, minWaitTime:Int) extends Thread with PiApproximation {
 
     implicit val spark = _spark
     var pi:Double = -1
 
     override def run {
-      Thread.sleep(math.max(new Random(MAX_WAIT_TIME).nextInt, MIN_WAIT_TIME))
+      Thread.sleep(math.max(new Random().nextInt(maxWaitTime), minWaitTime))
       pi = approximatePi
+    }
+  }
+
+  def concurrentWorkload(iterations:Int, concurrentWorkload:Int, maxWaitTime:Int, minWaitTime:Int)(implicit spark:SparkContext) {
+    for(i <- 1 to iterations) {
+      val threads = List.fill(concurrentWorkload)(new Workload(spark, maxWaitTime, minWaitTime))
+        threads.foreach(_.start)
+        threads.foreach(_.join)
+        threads.foreach { wl =>
+          println(s"iteration $i : pi is approximately: ${wl.pi}")
+      }
     }
   }
 
   def main(args: Array[String]) {
   	
     val conf = new SparkConf().setAppName("Interactive Workload")
-    implicit val spark = new SparkContext(conf)
-
-    for(i <- 1 to ITERATIONS) {
-      val threads = List.fill(CONCURRENT_WORKLOADS)(new Workload(spark))
-      threads.foreach(_.start)
-      threads.foreach(_.join)
-      threads.foreach { wl =>
-        println(s"iteration $i : pi is approximately: ${wl.pi}")
-      }
-    }
+    implicit val spark = new SparkContext(conf)    
+    concurrentWorkload(ITERATIONS, CONCURRENT_WORKLOADS, MAX_WAIT_TIME, MIN_WAIT_TIME)
 
     spark.stop()
   }

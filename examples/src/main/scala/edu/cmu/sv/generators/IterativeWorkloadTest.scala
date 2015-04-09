@@ -12,6 +12,14 @@ import org.apache.spark._
 object IterativeWorkloadTest extends PiApproximation {
 
   final val ITERATIONS = 5000
+  final val SLEEP_MILLIS = 1000
+
+  def iterativeWorkload(iterations:Int, sleepMillis:Int)(implicit spark:SparkContext) {
+    for(i <- 1 to iterations) {
+      println(s"iteration $i - Pi is roughly: " + approximatePi)
+      Thread.sleep(sleepMillis)
+    }
+  }
 
   def main(args: Array[String]) {
   	
@@ -19,10 +27,7 @@ object IterativeWorkloadTest extends PiApproximation {
     implicit val spark = new SparkContext(conf)
     
     //every second for 5000 iterations
-    for(i <- 1 to ITERATIONS) {
-    	println(s"iteration $i - Pi is roughly: " + approximatePi)
-      Thread.sleep(1000)
-    }
+    iterativeWorkload(ITERATIONS, SLEEP_MILLIS)
 
     spark.stop()
   }
