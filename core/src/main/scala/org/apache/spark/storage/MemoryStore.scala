@@ -61,14 +61,21 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
   private[spark] val hitMiss = new LinkedHashMap[BlockId, LinkedList[Boolean]]() //hit is true
 
+  //TODO: get value of useBayes from configuration, false stands for not using bayes.
+  val useBayes = true
+  var dataset : DataSet = null
+  var eva : Evaluation = null
+
   @volatile private var currentMemory = 0L
   
   //create the bayse classifier.
   // for (String path : dataPaths) {
-  val dataset = new DataSet("segment.data")
+  if(useBayes) {
+    dataset = new DataSet("segment.data")
 
-  val eva = new Evaluation(dataset, "NaiveBayes")
-  eva.crossValidation(2);
+    eva = new Evaluation(dataset, "NaiveBayes")
+    eva.crossValidation(2)
+  }
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
   // print mean and standard deviation of accuracy
@@ -509,14 +516,14 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usageIterator.hasNext) {
         var usagePair = usageIterator.next()
         var usageBlockId = usagePair.getKey
-        var predict = eva.predict(Array(usage.get(usageBlockId).size()))
+        var predict = eva.predict(Array(usage.get(usageBlockId).size(), 10))
         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
           + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
           + s" predict:" + String.valueOf(predict))
         while(usageIterator.hasNext) {
           usagePair = usageIterator.next()
           var usageTempBlockId = usagePair.getKey
-          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size()))
+          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size(), 10))
           logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
           + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
           + s" predict:" + String.valueOf(tempPredict))
@@ -595,9 +602,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
-
-      selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-
+      
+      if(useBayes) {
+        selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+      } else {
+        selectedMemory = findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+      }
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
