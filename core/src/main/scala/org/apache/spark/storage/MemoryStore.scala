@@ -65,10 +65,11 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   
   //create the bayse classifier.
   // for (String path : dataPaths) {
-  val dataset = new DataSet("segment.data")
+  //val dataset = new DataSet("segment.data")
 
-  val eva = new Evaluation(dataset, "NaiveBayes")
-  val test = eva.crossValidation(2);
+  //val eva = new Evaluation(dataset, "NaiveBayes")
+  //val test = eva.crossValidation(2);
+
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
   // print mean and standard deviation of accuracy
@@ -123,6 +124,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      //////////////////////////////////////////////////////
+      writeUsageInfo()
+      //////////////////////////////////////////////////////
       entries.get(blockId).size
     }
   }
@@ -213,6 +217,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      //////////////////////////////////////////////////////
+      writeUsageInfo()
+      //////////////////////////////////////////////////////
       if (entry == null) {
         None
       } else if (entry.deserialized) {
@@ -484,31 +491,31 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         }
       }
       logInfo(s"----------------------------test for bayse------------------------")
-      var usageEntries = usage.entrySet()
-      var usageIterator = usageEntries.iterator()
-      if(usageIterator.hasNext) {
-        var usagePair = usageIterator.next()
-        var usageBlockId = usagePair.getKey
-        var predict = test.predict(Array(usage.get(usageBlockId).size()))
-        logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
-          + s" predict:" + String.valueOf(predict))
-        while(usageIterator.hasNext) {
-          usagePair = usageIterator.next()
-          var usageTempBlockId = usagePair.getKey
-          var tempPredict = test.predict(Array(usage.get(usageTempBlockId).size()))
-          logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
-          + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
-          + s" predict:" + String.valueOf(tempPredict))
-          if(predict > tempPredict) {
-            predict = tempPredict
-            usageBlockId = usageTempBlockId
-          }
-        }
-        logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
-          + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
-      }
+      // var usageEntries = usage.entrySet()
+      // var usageIterator = usageEntries.iterator()
+      // if(usageIterator.hasNext) {
+      //   var usagePair = usageIterator.next()
+      //   var usageBlockId = usagePair.getKey
+      //   var predict = test.predict(Array(usage.get(usageBlockId).size()))
+      //   logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+      //     + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
+      //     + s" predict:" + String.valueOf(predict))
+      //   while(usageIterator.hasNext) {
+      //     usagePair = usageIterator.next()
+      //     var usageTempBlockId = usagePair.getKey
+      //     var tempPredict = test.predict(Array(usage.get(usageTempBlockId).size()))
+      //     logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
+      //     + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
+      //     + s" predict:" + String.valueOf(tempPredict))
+      //     if(predict > tempPredict) {
+      //       predict = tempPredict
+      //       usageBlockId = usageTempBlockId
+      //     }
+      //   }
+      //   logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+      //     + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
+      //     + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
+      // }
       logInfo(s"----------------------------test end------------------------")
     // TODO: utilize usage structure
     
@@ -590,7 +597,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
             if(usage.get(blockId) == null)
               usage.put(blockId, new LinkedList[Long]())
             usage.get(blockId).add(System.currentTimeMillis())
-  
+            ///////////////////////////////////////////////////
+            writeUsageInfo()
+            ///////////////////////////////////////////////////
             // This should never be null as only one thread should be dropping
             // blocks and removing entries. However the check is still here for
             // future safety.
@@ -713,20 +722,26 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
    */
   def writeUsageInfo() {
     logInfo(s"CMU - Usage information written to csv file ")
-    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.txt", true)))
+    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.csv", true)))
     val iterator = usage.entrySet().iterator()
     while (iterator.hasNext) {
       var str = ""
       val pair = iterator.next()
       val blockId = pair.getKey
       val freq = pair.getValue.size
-      str = str + blockId + "," + freq + ",\n"
+      str = str + blockId + "," + freq + "\n"
       out.write(str)
     }
     out.close()
   }
 
-
+  /**
+   * get the size of usage
+   */
+  def getUsageSize(): Long = {
+    var usageSize = usage.size
+    usageSize
+  }
   /**
    * Log a warning for failing to unroll a block.
    *
