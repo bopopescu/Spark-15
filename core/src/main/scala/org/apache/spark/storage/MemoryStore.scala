@@ -67,7 +67,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   val dataset = new DataSet("segment.data")
 
   val eva = new Evaluation(dataset, "NaiveBayes")
-  val test = eva.crossValidation(2);
+  eva.crossValidation(2);
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
   // print mean and standard deviation of accuracy
@@ -488,14 +488,14 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usageIterator.hasNext) {
         var usagePair = usageIterator.next()
         var usageBlockId = usagePair.getKey
-        var predict = test.predict(Array(usage.get(usageBlockId).size()))
+        var predict = eva.predict(Array(usage.get(usageBlockId).size()))
         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
           + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
           + s" predict:" + String.valueOf(predict))
         while(usageIterator.hasNext) {
           usagePair = usageIterator.next()
           var usageTempBlockId = usagePair.getKey
-          var tempPredict = test.predict(Array(usage.get(usageTempBlockId).size()))
+          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size()))
           logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
           + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
           + s" predict:" + String.valueOf(tempPredict))
