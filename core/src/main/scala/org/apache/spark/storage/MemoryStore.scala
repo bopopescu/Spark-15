@@ -60,6 +60,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   logInfo(s"*******************************************************")
   //usage is used to contain the time when Block is inserted or used.
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
+  private[spark] val hitMiss = new LinkedHashMap[BlockId, LinkedList[Boolean]]() //hit is true
 
   @volatile private var currentMemory = 0L
   
@@ -67,8 +68,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   // for (String path : dataPaths) {
   //val dataset = new DataSet("segment.data")
 
-  //val eva = new Evaluation(dataset, "NaiveBayes")
-  //val test = eva.crossValidation(2);
+  val eva = new Evaluation(dataset, "NaiveBayes")
+  eva.crossValidation(2);
 
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
@@ -110,13 +111,36 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   logInfo("MemoryStore started with capacity %s".format(Utils.bytesToString(maxMemory)))
 
+  private val trainingDataGenerator = new csvGenerator(usage, hitMiss)
+  trainingDataGenerator.start
+
+  private def addHitMiss(blockId:BlockId, hit:Boolean) {
+    val ll = hitMiss.get(blockId)
+    if(ll == null) {
+      val nll = new LinkedList[Boolean]()
+      nll.add(hit)
+      hitMiss.put(blockId, nll)
+    }
+    else
+      ll.add(hit)
+  }
+
+  private def getEntry(blockId:BlockId) = {
+    val v = entries.get(blockId)
+    if(v == null)
+      addHitMiss(blockId, false)
+    else
+      addHitMiss(blockId, true)
+    v
+  }
+
   /** Free memory not occupied by existing blocks. Note that this does not include unroll memory. */
   def freeMemory: Long = maxMemory - currentMemory
 
   override def getSize(blockId: BlockId): Long = {
     synchronized {
       entries.synchronized {
-        entries.get(blockId).size
+        getEntry(blockId).size        
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -124,10 +148,13 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+
+
       //////////////////////////////////////////////////////
-      writeUsageInfo()
+      //writeUsageInfo()
       //////////////////////////////////////////////////////
-      entries.get(blockId).size
+      //entries.get(blockId).size
+      getEntry(blockId).size
     }
   }
 
@@ -209,7 +236,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     synchronized {
       val entry = entries.synchronized {
-        entries.get(blockId)
+        getEntry(blockId)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -218,7 +245,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
       //////////////////////////////////////////////////////
-      writeUsageInfo()
+      //writeUsageInfo()
       //////////////////////////////////////////////////////
       if (entry == null) {
         None
@@ -234,7 +261,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     synchronized {
       val entry = entries.synchronized {
-        entries.get(blockId)
+        getEntry(blockId)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -491,31 +518,33 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         }
       }
       logInfo(s"----------------------------test for bayse------------------------")
-      // var usageEntries = usage.entrySet()
-      // var usageIterator = usageEntries.iterator()
-      // if(usageIterator.hasNext) {
-      //   var usagePair = usageIterator.next()
-      //   var usageBlockId = usagePair.getKey
-      //   var predict = test.predict(Array(usage.get(usageBlockId).size()))
-      //   logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-      //     + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
-      //     + s" predict:" + String.valueOf(predict))
-      //   while(usageIterator.hasNext) {
-      //     usagePair = usageIterator.next()
-      //     var usageTempBlockId = usagePair.getKey
-      //     var tempPredict = test.predict(Array(usage.get(usageTempBlockId).size()))
-      //     logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
-      //     + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
-      //     + s" predict:" + String.valueOf(tempPredict))
-      //     if(predict > tempPredict) {
-      //       predict = tempPredict
-      //       usageBlockId = usageTempBlockId
-      //     }
-      //   }
-      //   logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-      //     + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
-      //     + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
-      // }
+
+      var usageEntries = usage.entrySet()
+      var usageIterator = usageEntries.iterator()
+      if(usageIterator.hasNext) {
+        var usagePair = usageIterator.next()
+        var usageBlockId = usagePair.getKey
+        var predict = eva.predict(Array(usage.get(usageBlockId).size()))
+        logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
+          + s" predict:" + String.valueOf(predict))
+        while(usageIterator.hasNext) {
+          usagePair = usageIterator.next()
+          var usageTempBlockId = usagePair.getKey
+          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size()))
+          logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
+          + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
+          + s" predict:" + String.valueOf(tempPredict))
+          if(predict > tempPredict) {
+            predict = tempPredict
+            usageBlockId = usageTempBlockId
+          }
+        }
+        logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
+          + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
+      }
+
       logInfo(s"----------------------------test end------------------------")
     // TODO: utilize usage structure
     
@@ -590,7 +619,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
           synchronized {
-            val entry = entries.synchronized { entries.get(blockId) }
+            val entry = entries.synchronized { getEntry(blockId) }
             // record access time for blockId in data structure
             logInfo(s"CMU - Usage data structure updated with new time entry. " +
                     "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
@@ -598,7 +627,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
               usage.put(blockId, new LinkedList[Long]())
             usage.get(blockId).add(System.currentTimeMillis())
             ///////////////////////////////////////////////////
-            writeUsageInfo()
+            //writeUsageInfo()
             ///////////////////////////////////////////////////
             // This should never be null as only one thread should be dropping
             // blocks and removing entries. However the check is still here for
