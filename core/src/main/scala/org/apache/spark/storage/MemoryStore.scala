@@ -516,24 +516,28 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usageIterator.hasNext) {
         var usagePair = usageIterator.next()
         var usageBlockId = usagePair.getKey
-        var predict = eva.predict(Array(usage.get(usageBlockId).size(), 10))
+        var predict = eva.predict(Array(usage.get(usageBlockId).size(), entries.get(usageBlockId).size))
         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
+          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
+          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+          + s" last access rate:" + String.valueOf(usage.get(usageBlockId).getLast() / System.currentTimeMillis()) 
           + s" predict:" + String.valueOf(predict))
         while(usageIterator.hasNext) {
           usagePair = usageIterator.next()
           var usageTempBlockId = usagePair.getKey
-          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size(), 10))
-          logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
-          + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
-          + s" predict:" + String.valueOf(tempPredict))
+          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size(), entries.get(usageBlockId).size))
+          logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
+          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+          + s" last access rate:" + String.valueOf((usage.get(usageBlockId).getLast() * 1.0) / (System.currentTimeMillis() * 1.0)) 
+          + s" predict:" + String.valueOf(predict))
           if(predict > tempPredict) {
             predict = tempPredict
             usageBlockId = usageTempBlockId
           }
         }
         logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
+          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).getLast())
           + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
       }
       logInfo(s"----------------------------test end------------------------")
