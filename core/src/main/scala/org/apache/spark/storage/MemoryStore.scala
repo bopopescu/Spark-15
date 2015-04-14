@@ -59,6 +59,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   logInfo(s"*******************************************************")
   //usage is used to contain the time when Block is inserted or used.
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
+  private[spark] val hitMiss = new LinkedHashMap[BlockId, LinkedList[Boolean]]() //hit is true
 
   @volatile private var currentMemory = 0L
   
@@ -108,13 +109,33 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   logInfo("MemoryStore started with capacity %s".format(Utils.bytesToString(maxMemory)))
 
+  private def addHitMiss(blockId:BlockId, hit:Boolean) {
+    val ll = hitMiss.get(blockId)
+    if(ll == null) {
+      val nll = new LinkedList[Boolean]()
+      nll.add(hit)
+      hitMiss.put(blockId, nll)
+    }
+    else
+      ll.add(hit)
+  }
+
+  private def getEntry(blockId:BlockId) = {
+    val v = entries.get(blockId)
+    if(v == null)
+      addHitMiss(blockId, false)
+    else
+      addHitMiss(blockId, true)
+    v
+  }
+
   /** Free memory not occupied by existing blocks. Note that this does not include unroll memory. */
   def freeMemory: Long = maxMemory - currentMemory
 
   override def getSize(blockId: BlockId): Long = {
     synchronized {
       entries.synchronized {
-        entries.get(blockId).size
+        getEntry(blockId).size        
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -122,7 +143,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
-      entries.get(blockId).size
+      getEntry(blockId).size
     }
   }
 
@@ -204,7 +225,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     synchronized {
       val entry = entries.synchronized {
-        entries.get(blockId)
+        getEntry(blockId)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -226,7 +247,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
     synchronized {
       val entry = entries.synchronized {
-        entries.get(blockId)
+        getEntry(blockId)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -582,7 +603,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
           synchronized {
-            val entry = entries.synchronized { entries.get(blockId) }
+            val entry = entries.synchronized { getEntry(blockId) }
             // record access time for blockId in data structure
             logInfo(s"CMU - Usage data structure updated with new time entry. " +
                     "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
