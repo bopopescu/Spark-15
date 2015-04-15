@@ -213,6 +213,10 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     logInfo("Spark configuration:\n" + conf.toDebugString)
   }
 
+  if (conf.contains("cmu.useBayes")){
+    System.setProperty("CMU_USEBAYES_FLAG", "true")
+  }
+
   // Set Spark driver host and port system properties
   conf.setIfMissing("spark.driver.host", Utils.localHostName())
   conf.setIfMissing("spark.driver.port", "0")
