@@ -61,15 +61,25 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   //usage is used to contain the time when Block is inserted or used.
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
   private[spark] val hitMiss = new LinkedHashMap[BlockId, LinkedList[Boolean]]() //hit is true
+  private[spark] val lastEntryAccessTime = new LinkedList[Long]()
+
+  lastEntryAccessTime.add(0)
+  //TODO: get value of useBayes from configuration, false stands for not using bayes.
+  val useBayes = true
+  var dataset : DataSet = null
+  var eva : Evaluation = null
 
   @volatile private var currentMemory = 0L
   
   //create the bayse classifier.
   // for (String path : dataPaths) {
-  //val dataset = new DataSet("segment.data")
 
-  val eva = new Evaluation(dataset, "NaiveBayes")
-  eva.crossValidation(2);
+  if(useBayes) {
+    dataset = new DataSet("segment.data")
+
+    eva = new Evaluation(dataset, "NaiveBayes")
+    eva.crossValidation(2)
+  }
 
   // val testonly = Array(4000.0)
   // val prediction = test.predict(testonly)
@@ -111,7 +121,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   logInfo("MemoryStore started with capacity %s".format(Utils.bytesToString(maxMemory)))
 
-  private val trainingDataGenerator = new csvGenerator(usage, hitMiss)
+  private val trainingDataGenerator = new csvGenerator(usage, hitMiss, entries, lastEntryAccessTime)
   trainingDataGenerator.start
 
   private def addHitMiss(blockId:BlockId, hit:Boolean) {
@@ -140,7 +150,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   override def getSize(blockId: BlockId): Long = {
     synchronized {
       entries.synchronized {
-        getEntry(blockId).size        
+        getEntry(blockId).size
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
@@ -148,7 +158,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
-
+      lastEntryAccessTime.set(0, System.currentTimeMillis())        
+      
 
       //////////////////////////////////////////////////////
       //writeUsageInfo()
@@ -244,6 +255,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      lastEntryAccessTime.set(0, System.currentTimeMillis())
       //////////////////////////////////////////////////////
       //writeUsageInfo()
       //////////////////////////////////////////////////////
@@ -269,6 +281,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      lastEntryAccessTime.set(0, System.currentTimeMillis())
       if (entry == null) {
         None
       } else if (entry.deserialized) {
@@ -285,6 +298,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     synchronized {
       entries.synchronized {
         val entry = entries.remove(blockId)
+        
         if (entry != null) {
           currentMemory -= entry.size
           logDebug(s"Block $blockId of size ${entry.size} dropped from memory (free $freeMemory)")
@@ -293,12 +307,14 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       // remove blockId in data structure
       logInfo(s"CMU - Usage data structure update. " +
               "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()))
+      lastEntryAccessTime.set(0, System.currentTimeMillis())
       if(usage.get(blockId) != null) {
         usage.remove(blockId)
         true
       } else {
         false
       }
+      
     }
   }
 
@@ -465,6 +481,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           if(usage.get(blockId) == null)
             usage.put(blockId, new LinkedList[Long]())
           usage.get(blockId).add(System.currentTimeMillis())
+          lastEntryAccessTime.set(0, System.currentTimeMillis())
         }
         val valuesOrBytes = if (deserialized) "values" else "bytes"
         logInfo("Block %s stored as %s in memory (estimated size %s, free %s)".format(
@@ -524,24 +541,28 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usageIterator.hasNext) {
         var usagePair = usageIterator.next()
         var usageBlockId = usagePair.getKey
-        var predict = eva.predict(Array(usage.get(usageBlockId).size()))
+        var predict = eva.predict(Array(usage.get(usageBlockId).size(), entries.get(usageBlockId).size))
         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size()) 
+          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
+          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+          + s" last access rate:" + String.valueOf(usage.get(usageBlockId).getLast() / System.currentTimeMillis()) 
           + s" predict:" + String.valueOf(predict))
         while(usageIterator.hasNext) {
           usagePair = usageIterator.next()
           var usageTempBlockId = usagePair.getKey
-          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size()))
-          logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
-          + s" frequency:" + String.valueOf(usage.get(usageTempBlockId).size()) 
-          + s" predict:" + String.valueOf(tempPredict))
+          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size(), entries.get(usageBlockId).size))
+          logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
+          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+          + s" last access rate:" + String.valueOf((usage.get(usageBlockId).getLast() * 1.0) / (System.currentTimeMillis() * 1.0)) 
+          + s" predict:" + String.valueOf(predict))
           if(predict > tempPredict) {
             predict = tempPredict
             usageBlockId = usageTempBlockId
           }
         }
         logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).get(0))
+          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).getLast())
           + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
       }
 
@@ -611,9 +632,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L
-
-      selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-
+      
+      if(useBayes) {
+        selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+      } else {
+        selectedMemory = findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+      }
       if (actualFreeMemory + selectedMemory >= space) {
         logInfo(s"${selectedBlocks.size} blocks selected for dropping")
         for (blockId <- selectedBlocks) {
@@ -626,6 +650,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
             if(usage.get(blockId) == null)
               usage.put(blockId, new LinkedList[Long]())
             usage.get(blockId).add(System.currentTimeMillis())
+            lastEntryAccessTime.set(0, System.currentTimeMillis())
             ///////////////////////////////////////////////////
             //writeUsageInfo()
             ///////////////////////////////////////////////////
