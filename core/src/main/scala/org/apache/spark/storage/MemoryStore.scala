@@ -524,6 +524,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usageIterator.hasNext) {
         var usagePair = usageIterator.next()
         var usageBlockId = usagePair.getKey
+        val lastAccess = usage.get(usageBlockId).getLast() * 1.0 / System.currentTimeMillis()
         var predict = eva.predict(Array(usage.get(usageBlockId).size(), entries.get(usageBlockId).size))
         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
           + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
