@@ -547,12 +547,12 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   private val dagSchedulerSource = new DAGSchedulerSource(this.dagScheduler)
   private val blockManagerSource = new BlockManagerSource(SparkEnv.get.blockManager)
   //added by qihao
-  private val memoryStoreSource = new MemoryStoreSource(SparkEnv.get.blockManager.memoryStore)
+  // private val memoryStoreSource = new MemoryStoreSource(SparkEnv.get.blockManager.memoryStore)
 
   private def initDriverMetrics() {
     SparkEnv.get.metricsSystem.registerSource(dagSchedulerSource)
     SparkEnv.get.metricsSystem.registerSource(blockManagerSource)
-    SparkEnv.get.metricsSystem.registerSource(memoryStoreSource)
+    // SparkEnv.get.metricsSystem.registerSource(memoryStoreSource)
   }
 
   initDriverMetrics()
