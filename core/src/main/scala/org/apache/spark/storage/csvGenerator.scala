@@ -25,12 +25,28 @@ class csvGenerator(usage: LinkedHashMap[BlockId, LinkedList[Long]], hitMiss: Lin
   
   override def run {
     println(s"CMU - Usage information written to csv file ")
+    val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate")))
     val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.csv", true)))
-
+    
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     var count = 0
-    var preLastTime = 0L;
+    var preLastTime = 0L
+
+    var index = 0
+    var str = inHitRate.readLine()
+    while(str != null) {
+      println(s"######################################## Name: " + getName() + " ########################################" + index)
+      str = str.trim()
+      if(str.length() > 0) {
+        var strArr = str.split("\t")
+        index = strArr(0).toInt
+      }
+      str = inHitRate.readLine()
+    }
+    index = index + 1
+    inHitRate.close()
     
+
     breakable{
       while(true) {
         val currTime = System.currentTimeMillis()
@@ -50,7 +66,7 @@ class csvGenerator(usage: LinkedHashMap[BlockId, LinkedList[Long]], hitMiss: Lin
           val blockSize = entries.get(blockId).size
           val ratio = 1.0 * pair.getValue.get(count-1) / currTime
           val label = new Random().nextInt(100)
-          str = str + blockId + "," + freq + "," + blockSize + "," + ratio + "," + label + "\n"
+          str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
           out.write(str)
         }
         if(preLastTime == lastTime)
@@ -63,6 +79,29 @@ class csvGenerator(usage: LinkedHashMap[BlockId, LinkedList[Long]], hitMiss: Lin
         Thread.sleep(1000)
       }
     }
+
+    //calculate the hit rate
+    val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate", true)))
+    val iteratorH = hitMiss.entrySet().iterator()
+    var hitCount = 0
+    var totalSize = 0
+    while(iteratorH.hasNext) {
+      val pair2 = iteratorH.next()
+      val list = pair2.getValue
+      totalSize = totalSize + list.size
+      for(i <- 0 until list.size) {
+        if(list.get(i) == true){
+          hitCount = hitCount + 1
+        }
+      }
+    }
+    val hitRate = 1.0 * hitCount / totalSize
+    var hitRateRst = ""
+    hitRateRst = hitRateRst + index + "\t" + hitRate + "\n"
+    outHitRate.write(hitRateRst)
+
     out.close()
+    outHitRate.close()
+    
   }
 }
