@@ -115,6 +115,10 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   }
 
   logInfo("MemoryStore started with capacity %s".format(Utils.bytesToString(maxMemory)))
+  private val lastEntryAccessTime = new LinkedList[Long]()
+  lastEntryAccessTime.add(0)
+  private val trainingDataGenerator = new csvGenerator(usage, hitMiss, entries, lastEntryAccessTime)
+  trainingDataGenerator.start
 
   private def addHitMiss(blockId:BlockId, hit:Boolean) {
     val ll = hitMiss.get(blockId)
@@ -150,6 +154,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      lastEntryAccessTime.set(0, System.currentTimeMillis())
       getEntry(blockId).size
     }
   }
@@ -240,6 +245,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      lastEntryAccessTime.set(0, System.currentTimeMillis())
       if (entry == null) {
         None
       } else if (entry.deserialized) {
@@ -262,6 +268,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       if(usage.get(blockId) == null)
         usage.put(blockId, new LinkedList[Long]())
       usage.get(blockId).add(System.currentTimeMillis())
+      lastEntryAccessTime.set(0, System.currentTimeMillis())
       if (entry == null) {
         None
       } else if (entry.deserialized) {
@@ -458,6 +465,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           if(usage.get(blockId) == null)
             usage.put(blockId, new LinkedList[Long]())
           usage.get(blockId).add(System.currentTimeMillis())
+          lastEntryAccessTime.set(0, System.currentTimeMillis())
         }
         val valuesOrBytes = if (deserialized) "values" else "bytes"
         logInfo("Block %s stored as %s in memory (estimated size %s, free %s)".format(
