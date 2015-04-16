@@ -520,7 +520,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
           + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
           + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-          + s" last access rate:" + String.valueOf((usage.get(usageBlockId).getLast() * 1.0) / (System.currentTimeMillis() * 1.0)) 
+          + s" last access rate:" + String.valueOf(usage.get(usageBlockId).getLast() / System.currentTimeMillis()) 
           + s" predict:" + String.valueOf(predict))
         while(usageIterator.hasNext) {
           usagePair = usageIterator.next()
