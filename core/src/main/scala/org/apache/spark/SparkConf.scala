@@ -144,6 +144,10 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging {
     this
   }
 
+  def setUseBayes(master: String): SparkConf = {
+    set("cmu.useBayes", master)
+  }
+
   /**
    * Use Kryo serialization and register the given set of classes with Kryo.
    * If called multiple times, this will append the classes from all calls together.

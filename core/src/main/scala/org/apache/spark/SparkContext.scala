@@ -213,6 +213,10 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     logInfo("Spark configuration:\n" + conf.toDebugString)
   }
 
+  if (conf.contains("cmu.useBayes")){
+    System.setProperty("CMU_USEBAYES_FLAG", "true")
+  }
+
   // Set Spark driver host and port system properties
   conf.setIfMissing("spark.driver.host", Utils.localHostName())
   conf.setIfMissing("spark.driver.port", "0")
@@ -542,10 +546,13 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
 
   private val dagSchedulerSource = new DAGSchedulerSource(this.dagScheduler)
   private val blockManagerSource = new BlockManagerSource(SparkEnv.get.blockManager)
+  //added by qihao
+  // private val memoryStoreSource = new MemoryStoreSource(SparkEnv.get.blockManager.memoryStore)
 
   private def initDriverMetrics() {
     SparkEnv.get.metricsSystem.registerSource(dagSchedulerSource)
     SparkEnv.get.metricsSystem.registerSource(blockManagerSource)
+    // SparkEnv.get.metricsSystem.registerSource(memoryStoreSource)
   }
 
   initDriverMetrics()
