@@ -1,21 +1,38 @@
 package org.apache.spark.storage
 
 import NaiveBayes._
+import scala.collection.mutable.{LinkedHashMap, ArrayBuffer}
+import java.nio.ByteBuffer
 
 private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap[A, B] {
 
-	import scala.collection.mutable.{LinkedHashMap, ArrayBuffer}
+	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
+  val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
+  var lastEntryAccessTime:Long = 0
 
-	private val usage = new LinkedHashMap[BlockId, ArrayBuffer[Long]]()
-  private val hitMiss = new LinkedHashMap[BlockId, ArrayBuffer[Boolean]]() //hit is true
-  private val lastEntryAccessTime = new ArrayBuffer[Long]()
+  private def addUsage(a: A) {
+    lastEntryAccessTime = System.currentTimeMillis
+    val usages = usage.getOrElseUpdate(a, ArrayBuffer[Long]())
+    usages += lastEntryAccessTime
+  }
+
+  private def addHitMiss(a: A, hit:Boolean) {
+    val hitMisses = hitMiss.getOrElseUpdate(a, ArrayBuffer[Boolean]())
+    hitMisses += hit
+  }
+
+  def getNoUsage(a: A): B = super.get(a)
 
 	override def get(a: Any): B = {
-		super.get(a)
+    val b = super.get(a)
+    addUsage(a.asInstanceOf[A])
+    addHitMiss(a.asInstanceOf[A], b != null)
+    b
 	}
 
-	override def put(a:A, b:B):B = {
-		super.put(a, b)
+	override def put(a:A, b:B):B = {		
+    addUsage(a)
+    super.put(a, b)
 	}
 }
 
@@ -24,189 +41,175 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
 
   override val entries = new EnrichedLinkedHashMap[BlockId, MemoryEntry]
 	
-  var dataset : DataSet = null
-	var eva : Evaluation = null
-
-  // lastEntryAccessTime.add(0)
-
   val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
+  var dataset : DataSet = null
+  var eva : Evaluation = null
 
+  //create the bayes classifier.
   if(useBayes) {
     dataset = new DataSet("segment.data")
-
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
   }
 
-  //create the bayse classifier.
-  // for (String path : dataPaths) {
+  private val trainingDataGenerator = new CsvGenerator(entries)
+  trainingDataGenerator.start
 
-  if(useBayes) {
-    dataset = new DataSet("segment.data")
+  protected def findBlocksToReplace (
+    entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
+    actualFreeMemory: Long,
+    space: Long,
+    rddToAdd: Option[Int],
+    selectedBlocks: ArrayBuffer[BlockId],
+    selectedMemory: Long) : Long = {
 
-    eva = new Evaluation(dataset, "NaiveBayes")
-    eva.crossValidation(2)
+    if(useBayes)
+      naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+    else
+      findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
   }
 
-  // val testonly = Array(4000.0)
-  // val prediction = test.predict(testonly)
-  // print mean and standard deviation of accuracy
-  // System.out.println("Dataset:" + path + ", mean and standard deviation of accuracy:" + eva.getAccMean() + "," + eva.getAccStd());
-  // Ensure only one thread is putting, and if necessary, dropping blocks at any given time
+  private def naiveBayesFindBlocksToReplace(
+    entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
+    actualFreeMemory: Long,
+    space: Long,
+    rddToAdd: Option[Int],
+    selectedBlocks: ArrayBuffer[BlockId],
+    selectedMemory: Long) : Long = {
 
-  // private val trainingDataGenerator = new csvGenerator(usage, hitMiss, entries, lastEntryAccessTime)
-  // trainingDataGenerator.start
+    var resultSelectedMemory = selectedMemory
+    synchronized {
+      entries.synchronized {
+        val cmuEntries = entries.entrySet()
+        val iterator = cmuEntries.iterator()
 
-  // private def addHitMiss(blockId:BlockId, hit:Boolean) {
-  //   val ll = hitMiss.get(blockId)
-  //   if(ll == null) {
-  //     val nll = new LinkedList[Boolean]()
-  //     nll.add(hit)
-  //     hitMiss.put(blockId, nll)
-  //   }
-  //   else
-  //     ll.add(hit)
-  // }
+        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+          val pair = iterator.next()
+          val blockId = pair.getKey
+          val blockUsage = entries.usage.getOrElse(blockId, new ArrayBuffer[Long](0))
+          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
+            logInfo(s"########################## blockId is $blockId ##############")
+            selectedBlocks += blockId
+            resultSelectedMemory += pair.getValue.size
+            logInfo(s"Block: " + String.valueOf(blockId)
+                + s" timeLine: " + String.valueOf(blockUsage(0))
+                + s" access frequency: " + String.valueOf(blockUsage.size));
+          }
+        }
+      }
 
-  // private def getEntry(blockId:BlockId) = {
-  //   val v = entries.get(blockId)
-  //   if(v == null)
-  //     addHitMiss(blockId, false)
-  //   else
-  //     addHitMiss(blockId, true)
-  //   v
-  // }
+      logInfo(s"----------------------------test for bayse------------------------")      
+      var usageIterator = entries.usage.toIterator
+      if(usageIterator.hasNext) {
+        var (usageBlockId, blockUsage) = usageIterator.next()        
+        val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
+        var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
+        logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+          + s" frequency:" + String.valueOf(blockUsage.size)
+          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+          + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
+          + s" predict:" + String.valueOf(predict))
 
-//   private val trainingDataGenerator = new csvGenerator(usage, hitMiss, entries, lastEntryAccessTime)
-// +  trainingDataGenerator.start
+        while(usageIterator.hasNext) {
+          var (usageBlockId, blockUsage) = usageIterator.next()
+          var tempPredict = eva.predict(Array(blockUsage.size, entries.get(usageBlockId).size))
+          logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+          + s" frequency:" + String.valueOf(blockUsage.size)
+          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+          + s" last access rate:" + String.valueOf((blockUsage.last * 1.0) / (System.currentTimeMillis() * 1.0)) 
+          + s" predict:" + String.valueOf(predict))
+          if(predict > tempPredict) {
+            predict = tempPredict
+            usageBlockId = usageBlockId
+          }
+        }
+        logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+          + s" timeLine: " + String.valueOf(blockUsage.last)
+          + s" access frequency: " + String.valueOf(blockUsage.size));
+      }
+
+      logInfo(s"----------------------------test end------------------------")
+    // TODO: utilize usage structure
+    
+    }
+    resultSelectedMemory
+
+  }
+
+  private def findBlocksToReplaceOriginal (
+    entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
+    actualFreeMemory: Long,
+    space: Long,
+    rddToAdd: Option[Int],
+    selectedBlocks: ArrayBuffer[BlockId],
+    selectedMemory: Long) : Long = {
+  // This is synchronized to ensure that the set of entries is not changed
+  // (because of getValue or getBytes) while traversing the iterator, as that
+  // can lead to exceptions.
+    var resultSelectedMemory = selectedMemory
+    entries.synchronized {
+      val iterator = entries.entrySet().iterator()
+      while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+        val pair = iterator.next()
+        val blockId = pair.getKey
+        if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
+          selectedBlocks += blockId
+          resultSelectedMemory += pair.getValue.size
+        }
+      }
+    }
+    resultSelectedMemory
+  }
+
+  protected override def ensureFreeSpace(
+      blockIdToAdd: BlockId,
+      space: Long): ResultWithDroppedBlocks = {
+    logInfo(s"ensureFreeSpace($space) called with curMem=$currentMemory, maxMem=$maxMemory")
+
+    val droppedBlocks = new ArrayBuffer[(BlockId, BlockStatus)]
+
+    if (space > maxMemory) {
+      logInfo(s"Will not store $blockIdToAdd as it is larger than our memory limit")
+      return ResultWithDroppedBlocks(success = false, droppedBlocks)
+    }
+
+    // Take into account the amount of memory currently occupied by unrolling blocks
+    val actualFreeMemory = freeMemory - currentUnrollMemory
+
+    //if (actualFreeMemory < space) {
+      val rddToAdd = getRddId(blockIdToAdd)
+      val selectedBlocks = new ArrayBuffer[BlockId]
+      var selectedMemory = 0L      
+
+      findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)      
+
+      if (actualFreeMemory + selectedMemory >= space) {
+        logInfo(s"${selectedBlocks.size} blocks selected for dropping")
+        for (blockId <- selectedBlocks) {
+          val entry = entries.synchronized { entries.get(blockId) }
+          // This should never be null as only one thread should be dropping
+          // blocks and removing entries. However the check is still here for
+          // future safety.
+          if (entry != null) {
+            val data = if (entry.deserialized) {
+              Left(entry.value.asInstanceOf[Array[Any]])
+            } else {
+              Right(entry.value.asInstanceOf[ByteBuffer].duplicate())
+            }
+            val droppedBlockStatus = blockManager.dropFromMemory(blockId, data)
+            droppedBlockStatus.foreach { status => droppedBlocks += ((blockId, status)) }
+          }
+        }
+        return ResultWithDroppedBlocks(success = true, droppedBlocks)
+      } else {
+        logInfo(s"Will not store $blockIdToAdd as it would require dropping another block " +
+          "from the same RDD")
+        return ResultWithDroppedBlocks(success = false, droppedBlocks)
+      }
+    //}
+    ResultWithDroppedBlocks(success = true, droppedBlocks)
+  }
 
 
-//   +
-// +  /**
-// +  *Define the ways to choose which blcok to swap out
-// +  */
-// +  //question: the parameters passed in are val?
-// +  private def findBlocksToReplace (
-// +    entries: LinkedHashMap[BlockId, MemoryEntry],
-// +    actualFreeMemory: Long,
-// +    space: Long,
-// +    rddToAdd: Option[Int],
-// +    selectedBlocks: ArrayBuffer[BlockId],
-// +    selectedMemory: Long) : Long = {
-// +    var resultSelectedMemory = selectedMemory
-// +    synchronized {
-// +      entries.synchronized {
-// +        val cmuEntries = entries.entrySet()
-// +        val iterator = cmuEntries.iterator()
-// +        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-// +          val pair = iterator.next()
-// +          val blockId = pair.getKey
-// +          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-// +            logInfo(s"########################## blockId is $blockId ##############")
-// +            selectedBlocks += blockId
-// +            resultSelectedMemory += pair.getValue.size
-// +            logInfo(s"Block: " + String.valueOf(blockId)
-// +                + s" timeLine: " + String.valueOf(usage.get(blockId).get(0))
-// +                + s" access frequency: " + String.valueOf(usage.get(blockId).size()));
-// +          }
-// +        }
-// +      }
-// +      logInfo(s"----------------------------test for bayse------------------------")
-// +
-// +      var usageEntries = usage.entrySet()
-// +      var usageIterator = usageEntries.iterator()
-// +      if(usageIterator.hasNext) {
-// +        var usagePair = usageIterator.next()
-// +        var usageBlockId = usagePair.getKey
-// +        var predict = eva.predict(Array(usage.get(usageBlockId).size(), entries.get(usageBlockId).size))
-// +        logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-// +          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
-// +          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-// +          + s" last access rate:" + String.valueOf(usage.get(usageBlockId).getLast() / System.currentTimeMillis()) 
-// +          + s" predict:" + String.valueOf(predict))
-// +        while(usageIterator.hasNext) {
-// +          usagePair = usageIterator.next()
-// +          var usageTempBlockId = usagePair.getKey
-// +          var tempPredict = eva.predict(Array(usage.get(usageTempBlockId).size(), entries.get(usageBlockId).size))
-// +          logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-// +          + s" frequency:" + String.valueOf(usage.get(usageBlockId).size())
-// +          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-// +          + s" last access rate:" + String.valueOf((usage.get(usageBlockId).getLast() * 1.0) / (System.currentTimeMillis() * 1.0)) 
-// +          + s" predict:" + String.valueOf(predict))
-// +          if(predict > tempPredict) {
-// +            predict = tempPredict
-// +            usageBlockId = usageTempBlockId
-// +          }
-// +        }
-// +        logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-// +          + s" timeLine: " + String.valueOf(usage.get(usageBlockId).getLast())
-// +          + s" access frequency: " + String.valueOf(usage.get(usageBlockId).size()));
-// +      }
-// +
-// +      logInfo(s"----------------------------test end------------------------")
-// +    // TODO: utilize usage structure
-// +    
-// +    }
-// +    resultSelectedMemory
-// +  }
-// +  
-// +  
-// +  private def findBlocksToReplaceOriginal (
-// +    entries: LinkedHashMap[BlockId, MemoryEntry],
-// +    actualFreeMemory: Long,
-// +    space: Long,
-// +    rddToAdd: Option[Int],
-// +    selectedBlocks: ArrayBuffer[BlockId],
-// +    selectedMemory: Long) : Long = {
-// +  // This is synchronized to ensure that the set of entries is not changed
-// +  // (because of getValue or getBytes) while traversing the iterator, as that
-// +  // can lead to exceptions.
-// +    var resultSelectedMemory = selectedMemory
-// +    entries.synchronized {
-// +      val iterator = entries.entrySet().iterator()
-// +      while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-// +        val pair = iterator.next()
-// +        val blockId = pair.getKey
-// +        if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-// +          selectedBlocks += blockId
-// +          resultSelectedMemory += pair.getValue.size
-// +        }
-// +      }
-// +    }
-// +    resultSelectedMemory
-// +  }
-// +
-
-
-//    if(useBayes) {
-// -      // (because of getValue or getBytes) while traversing the iterator, as that		+        selectedMemory = findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-// -      // can lead to exceptions.		+      } else {
-// -      entries.synchronized {		+        selectedMemory = findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-// -        		+      }
-
-//   +   * generate the csv file of usage info for naive bayesian training.
-// +   */
-// +  def writeUsageInfo() {
-// +    logInfo(s"CMU - Usage information written to csv file ")
-// +    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.csv", true)))
-// +    val iterator = usage.entrySet().iterator()
-// +    while (iterator.hasNext) {
-// +      var str = ""
-// +      val pair = iterator.next()
-// +      val blockId = pair.getKey
-// +      val freq = pair.getValue.size
-// +      str = str + blockId + "," + freq + "\n"
-// +      out.write(str)
-// +    }
-// +    out.close()
-// +  }
-// +
-// +  /**
-// +   * get the size of usage
-// +   */
-// +  def getUsageSize(): Long = {
-// +    var usageSize = usage.size
-// +    usageSize
-// +  }
 
 }
