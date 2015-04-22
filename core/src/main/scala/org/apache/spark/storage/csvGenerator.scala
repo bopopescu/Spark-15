@@ -86,9 +86,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           if(count >= 5)
             break
 
-          preLastTime = lastTime
-          Thread.sleep(1000)
+          preLastTime = lastTime          
         }
+        Thread.sleep(1000)
       }
     }
 
