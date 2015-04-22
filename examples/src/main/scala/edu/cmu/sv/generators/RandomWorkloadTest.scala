@@ -33,6 +33,8 @@ object RandomWorkloadTest {
     val pi = new PiRandomWorkload
     pi.randomWorkload()
 
+    Thread.sleep(10000)
+    
     spark.stop()
   }
 }

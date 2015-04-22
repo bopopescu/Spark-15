@@ -8,7 +8,7 @@ import scala.math.random
 import org.apache.spark._
 import scala.util.Random
 import scala.util.control.Breaks._
-
+import java.nio.file.{Paths, Files}
 import java.io.PrintWriter
 
 /* 
@@ -20,32 +20,36 @@ import java.io.PrintWriter
 class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends Thread {
   
   override def run {
-    println(s"CMU - Usage information written to csv file ")
-    val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate")))
+
     val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.csv", true)))
-    
-    println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     var count = 0
     var preLastTime = 0L
-
     var index = 0
-    var str = inHitRate.readLine()
-    while(str != null) {
-      println(s"######################################## Name: " + getName() + " ########################################" + index)
-      str = str.trim()
-      if(str.length() > 0) {
-        var strArr = str.split("\t")
-        index = strArr(0).toInt
+
+    if(Files.exists(Paths.get("HitRate.csv"))) {
+      println(s"CMU - Usage information written to csv file ")
+      val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate.csv")))    
+      
+      println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))      
+
+      var str = inHitRate.readLine()
+      while(str != null) {
+        println(s"######################################## Name: " + getName() + " ########################################" + index)
+        str = str.trim()
+        if(str.length() > 0) {
+          var strArr = str.split("\t")
+          index = strArr(0).toInt
+        }
+        str = inHitRate.readLine()
       }
-      str = inHitRate.readLine()
+      index = index + 1
+      inHitRate.close()
     }
-    index = index + 1
-    inHitRate.close()
-    
 
     breakable {
-      entries.synchronized {
-        while(true) {
+      
+      while(true) {        
+        entries.synchronized {
           val currTime = System.currentTimeMillis()
           var lastTime = entries.lastEntryAccessTime
           println(s"######################################## Name: " + getName() + " ########################################")
@@ -77,34 +81,34 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             break
 
           preLastTime = lastTime
-          Thread.sleep(1000)
         }
+        Thread.sleep(1000)
       }
-    }
 
-    //calculate the hit rate
-    entries.synchronized {
-      val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate", true)))
-      val iteratorH = entries.hitMiss.toIterator
-      var hitCount = 0
-      var totalSize = 0
-      while(iteratorH.hasNext) {
-        val (blockId, list) = iteratorH.next()
-        totalSize = totalSize + list.size
-        for(i <- 0 until list.size) {
-          if(list(i) == true){
-            hitCount = hitCount + 1
+      //calculate the hit rate
+      entries.synchronized {
+        println(s"######################################## Writing HitRate ########################################")
+        val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.csv", true)))
+        val iteratorH = entries.hitMiss.toIterator
+        var hitCount = 0
+        var totalSize = 0
+        while(iteratorH.hasNext) {
+          val (blockId, list) = iteratorH.next()
+          totalSize = totalSize + list.size
+          for(i <- 0 until list.size) {
+            if(list(i) == true){
+              hitCount = hitCount + 1
+            }
           }
         }
-      }
-      val hitRate = 1.0 * hitCount / totalSize
-      var hitRateRst = ""
-      hitRateRst = hitRateRst + index + "\t" + hitRate + "\n"
-      outHitRate.write(hitRateRst)
+        val hitRate = 1.0 * hitCount / totalSize
+        var hitRateRst = ""
+        hitRateRst = hitRateRst + index + "\t" + hitRate + "\n"
+        outHitRate.write(hitRateRst)
 
-      out.close()
-      outHitRate.close()
-    }
-    
+        out.close()
+        outHitRate.close()
+      }
+    }    
   }
 }
