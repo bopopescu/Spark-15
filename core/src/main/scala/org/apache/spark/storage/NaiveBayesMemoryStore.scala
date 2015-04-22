@@ -15,6 +15,10 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
     val usages = usage.getOrElseUpdate(a, ArrayBuffer[Long]())
     usages += lastEntryAccessTime
   }
+  
+  def removeUsageEntries(a: A) {
+    usage.remove(a)
+  }
 
   private def addHitMiss(a: A, hit:Boolean) {
     val hitMisses = hitMiss.getOrElseUpdate(a, ArrayBuffer[Boolean]())
@@ -44,15 +48,26 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
   var dataset : DataSet = null
   var eva : Evaluation = null
+  
+  val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","iterative"))
+  var selectedInputFile = "segment1.data"
+  
+  if(jobName == "iterative")
+    selectedInputFile = "segment1.data"
+  else if (jobName =="interactive")
+    selectedInputFile = "segment2.data"
+  else if(jobName == "combination")
+    selectedInputFile = "segment3.data"
 
   //create the bayes classifier.
   if(useBayes) {
-    dataset = new DataSet("segment.data")
+    dataset = new DataSet(selectedInputFile)
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
   }
-
-  private val trainingDataGenerator = new CsvGenerator(entries)
+  
+  
+  private val trainingDataGenerator = new CsvGenerator(entries, jobName)
   trainingDataGenerator.start
 
   protected def findBlocksToReplace (
@@ -98,42 +113,45 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
         }
       }
 
-      logInfo(s"----------------------------test for bayse------------------------")      
-      var usageIterator = entries.usage.toIterator
-      if(usageIterator.hasNext) {
-        var (usageBlockId, blockUsage) = usageIterator.next()        
-        val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
-        var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
-        logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-          + s" frequency:" + String.valueOf(blockUsage.size)
-          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-          + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
-          + s" predict:" + String.valueOf(predict))
-
-        while(usageIterator.hasNext) {
-          var (usageBlockId, blockUsage) = usageIterator.next()
-          var tempPredict = eva.predict(Array(blockUsage.size, entries.get(usageBlockId).size))
+      logInfo(s"----------------------------test for bayse------------------------")
+      while (actualFreeMemory + selectedMemory < space && entries.usage.toIterator.hasNext) {
+        var usageIterator = entries.usage.toIterator
+        if(usageIterator.hasNext) {
+          var (usageBlockId, blockUsage) = usageIterator.next()        
+          val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
+          var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size, lastAccess))
           logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-          + s" frequency:" + String.valueOf(blockUsage.size)
-          + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-          + s" last access rate:" + String.valueOf((blockUsage.last * 1.0) / (System.currentTimeMillis() * 1.0)) 
-          + s" predict:" + String.valueOf(predict))
-          if(predict > tempPredict) {
-            predict = tempPredict
-            usageBlockId = usageBlockId
-          }
-        }
-        logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-          + s" timeLine: " + String.valueOf(blockUsage.last)
-          + s" access frequency: " + String.valueOf(blockUsage.size));
-      }
+            + s" frequency:" + String.valueOf(blockUsage.size)
+            + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+            + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
+            + s" predict:" + String.valueOf(predict))
 
+          while(usageIterator.hasNext) {
+            var (usageTempBlockId, blockUsage) = usageIterator.next()
+            var tempPredict = eva.predict(Array(blockUsage.size, entries.get(usageBlockId).size, lastAccess))
+            logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+            + s" frequency:" + String.valueOf(blockUsage.size)
+            + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+            + s" last access rate:" + String.valueOf((blockUsage.last * 1.0) / (System.currentTimeMillis() * 1.0)) 
+            + s" predict:" + String.valueOf(predict))
+            if(predict > tempPredict) {
+              predict = tempPredict
+              usageBlockId = usageTempBlockId
+            }
+          }
+          selectedBlocks += usageBlockId
+          resultSelectedMemory += entries.getNoUsage(usageBlockId).size
+          entries.removeUsageEntries(usageBlockId)
+          logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+            + s" timeLine: " + String.valueOf(blockUsage.last)
+            + s" access frequency: " + String.valueOf(blockUsage.size));
+        }
+      }
       logInfo(s"----------------------------test end------------------------")
     // TODO: utilize usage structure
     
     }
     resultSelectedMemory
-
   }
 
   private def findBlocksToReplaceOriginal (
@@ -209,7 +227,4 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     //}
     ResultWithDroppedBlocks(success = true, droppedBlocks)
   }
-
-
-
 }

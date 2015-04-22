@@ -24,6 +24,8 @@ object IterativeWorkloadTest {
     val pi = new PiIterativeWorkload
     pi.iterativeWorkload()
 
+    Thread.sleep(10000)
+    
     spark.stop()
   }
 }
