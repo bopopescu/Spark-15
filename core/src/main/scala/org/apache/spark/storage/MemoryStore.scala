@@ -61,8 +61,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   private[spark] val usage = new LinkedHashMap[BlockId, LinkedList[Long]]()
   private[spark] val hitMiss = new LinkedHashMap[BlockId, LinkedList[Boolean]]() //hit is true
 
-  //TODO: get value of useBayes from configuration, false stands for not using bayes.
-  val useBayes = true
+  val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
   var dataset : DataSet = null
   var eva : Evaluation = null
 
