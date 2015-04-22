@@ -32,11 +32,15 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     
     println(s"CMU - Usage information written to csv file ")
 
+    var count = 0
+    var preLastTime = 0L
+    var index = 0
+
     try{
       val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate.txt")))
       var str = inHitRate.readLine()
       while(str != null) {
-        println(s"######################################## Name: " + getName() + " ########################################" + index)
+        println(s"######################################## Name: " + getName() + " ########################################")
         str = str.trim()
         if(str.length() > 0) {
           var strArr = str.split("\t")
@@ -49,7 +53,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     } 
     catch{
       case ex : IOException => {
-        println(s"######################################## Creating Hitrate.txt ########################################" + index)
+        println(s"######################################## Creating Hitrate.txt ########################################")
         val newFile = new File("HitRate.txt")
         newFile.createNewFile()
         index = index + 1
@@ -63,10 +67,6 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     if(!dir.exists()) {
       dir.mkdirs()
     }
-
-    var count = 0
-    var preLastTime = 0L
-    var index = 0
 
     val out_record = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))
     val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
