@@ -17,12 +17,22 @@ import java.io.PrintWriter
  *    ./bin/spark-submit --class edu.cmu.sv.generators.InteractiveWorkloadTest --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar
  *    you can also use --master local[512]
  */
-class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends Thread {
+class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:String) extends Thread {
   
   override def run {
+    
+    var usageOutputFileName = "core/segment1.data"
+    
+    if(jobName == "iterative")
+      usageOutputFileName = "core/segment1.data"
+    else if (jobName == "interactive")
+      usageOutputFileName = "core/segment2.data"
+    else if(jobName == "combination")
+      usageOutputFileName = "core/segment3.data"
+    
     println(s"CMU - Usage information written to csv file ")
     val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate")))
-    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("usageHistory.csv", true)))
+    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
     
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     var count = 0
@@ -31,7 +41,6 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     var index = 0
     var str = inHitRate.readLine()
     while(str != null) {
-      println(s"######################################## Name: " + getName() + " ########################################" + index)
       str = str.trim()
       if(str.length() > 0) {
         var strArr = str.split("\t")
