@@ -43,64 +43,68 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     inHitRate.close()
     
 
-    breakable{
-      while(true) {
-        val currTime = System.currentTimeMillis()
-        var lastTime = entries.lastEntryAccessTime
-        println(s"######################################## Name: " + getName() + " ########################################")
-        println(s"######################################## time: " + currTime + " ########################################")
-        println(s"######################################## usage size: " + String.valueOf(entries.usage.size) + " ########################################")
-        println(s"######################################## hitMiss size: " + String.valueOf(entries.hitMiss.size) + " ########################################")
+    breakable {
+      entries.synchronized {
+        while(true) {
+          val currTime = System.currentTimeMillis()
+          var lastTime = entries.lastEntryAccessTime
+          println(s"######################################## Name: " + getName() + " ########################################")
+          println(s"######################################## time: " + currTime + " ########################################")
+          println(s"######################################## usage size: " + String.valueOf(entries.usage.size) + " ########################################")
+          println(s"######################################## hitMiss size: " + String.valueOf(entries.hitMiss.size) + " ########################################")
 
-        val iteratorU = entries.usage.toIterator
-        while (iteratorU.hasNext) {
-          var str = ""
-          val (blockId, usages) = iteratorU.next()          
-          val time1 = usages(0)
-          val count = usages.size
-          val freq = 1000.0 * count / (currTime - time1)
-          val blockSize = entries.getNoUsage(blockId).size
-          val ratio = 1.0 * usages(count-1) / currTime
-          val label = new Random().nextInt(100)
-          str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
-          out.write(str)
-          out.flush()
+          val iteratorU = entries.usage.toIterator
+          while (iteratorU.hasNext) {
+            var str = ""
+            val (blockId, usages) = iteratorU.next()          
+            val time1 = usages(0)
+            val count = usages.size
+            val freq = 1000.0 * count / (currTime - time1)
+            val blockSize = entries.getNoUsage(blockId).size
+            val ratio = 1.0 * usages(count-1) / currTime
+            val label = new Random().nextInt(100)
+            str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
+            out.write(str)
+            out.flush()
+          }
+
+          if(preLastTime == lastTime)
+            count = count + 1
+          else 
+            count = 0;
+
+          if(count >= 5)
+            break
+
+          preLastTime = lastTime
+          Thread.sleep(1000)
         }
-
-        if(preLastTime == lastTime)
-          count = count + 1
-        else 
-          count = 0;
-
-        if(count >= 5)
-          break
-
-        preLastTime = lastTime
-        Thread.sleep(1000)
       }
     }
 
     //calculate the hit rate
-    val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate", true)))
-    val iteratorH = entries.hitMiss.toIterator
-    var hitCount = 0
-    var totalSize = 0
-    while(iteratorH.hasNext) {
-      val (blockId, list) = iteratorH.next()
-      totalSize = totalSize + list.size
-      for(i <- 0 until list.size) {
-        if(list(i) == true){
-          hitCount = hitCount + 1
+    entries.synchronized {
+      val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate", true)))
+      val iteratorH = entries.hitMiss.toIterator
+      var hitCount = 0
+      var totalSize = 0
+      while(iteratorH.hasNext) {
+        val (blockId, list) = iteratorH.next()
+        totalSize = totalSize + list.size
+        for(i <- 0 until list.size) {
+          if(list(i) == true){
+            hitCount = hitCount + 1
+          }
         }
       }
-    }
-    val hitRate = 1.0 * hitCount / totalSize
-    var hitRateRst = ""
-    hitRateRst = hitRateRst + index + "\t" + hitRate + "\n"
-    outHitRate.write(hitRateRst)
+      val hitRate = 1.0 * hitCount / totalSize
+      var hitRateRst = ""
+      hitRateRst = hitRateRst + index + "\t" + hitRate + "\n"
+      outHitRate.write(hitRateRst)
 
-    out.close()
-    outHitRate.close()
+      out.close()
+      outHitRate.close()
+    }
     
   }
 }
