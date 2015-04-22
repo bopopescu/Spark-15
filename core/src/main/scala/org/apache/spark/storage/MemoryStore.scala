@@ -141,8 +141,10 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   private def getEntry(blockId:BlockId) = {
     val v = entries.get(blockId)
-    if(v == null)
+    if(v == null){
       addHitMiss(blockId, false)
+      println(s"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ MISS!!!!! $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+    }
     else
       addHitMiss(blockId, true)
     v
@@ -158,10 +160,13 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
-              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-      if(usage.get(blockId) == null)
-        usage.put(blockId, new LinkedList[Long]())
-      usage.get(blockId).add(System.currentTimeMillis())
+              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()) +"getSize")
+      usage.synchronized{
+        if(usage.get(blockId) == null)
+          usage.put(blockId, new LinkedList[Long]())
+        usage.get(blockId).add(System.currentTimeMillis())
+      }
+      
       lastEntryAccessTime.set(0, System.currentTimeMillis())        
       
 
@@ -255,10 +260,13 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
-              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-      if(usage.get(blockId) == null)
-        usage.put(blockId, new LinkedList[Long]())
-      usage.get(blockId).add(System.currentTimeMillis())
+              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()) + "getBytes")
+      usage.synchronized{
+        if(usage.get(blockId) == null)
+          usage.put(blockId, new LinkedList[Long]())
+        usage.get(blockId).add(System.currentTimeMillis())
+      }
+
       lastEntryAccessTime.set(0, System.currentTimeMillis())
       //////////////////////////////////////////////////////
       //writeUsageInfo()
@@ -281,10 +289,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       }
       // record access time for blockId in data structure
       logInfo(s"CMU - Usage data structure updated with new time entry. " +
-              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-      if(usage.get(blockId) == null)
-        usage.put(blockId, new LinkedList[Long]())
-      usage.get(blockId).add(System.currentTimeMillis())
+              "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()) + "getValues")
+      usage.synchronized{
+        if(usage.get(blockId) == null)
+          usage.put(blockId, new LinkedList[Long]())
+        usage.get(blockId).add(System.currentTimeMillis())
+      }
       lastEntryAccessTime.set(0, System.currentTimeMillis())
       if (entry == null) {
         None
@@ -310,15 +320,16 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       }
       // remove blockId in data structure
       logInfo(s"CMU - Usage data structure update. " +
-              "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()))
+              "Block $blockId removed at time %s" + String.valueOf(System.currentTimeMillis()) + "remove")
       lastEntryAccessTime.set(0, System.currentTimeMillis())
-      if(usage.get(blockId) != null) {
-        usage.remove(blockId)
-        true
-      } else {
-        false
+      usage.synchronized{
+        if(usage.get(blockId) != null) {
+          usage.remove(blockId)
+          true
+        } else {
+          false
+        }
       }
-      
     }
   }
 
@@ -330,7 +341,9 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
       }
       // remove data structure
       logInfo(s"CMU - Usage data structure cleared. ")
-      usage.clear()
+      usage.synchronized{
+        usage.clear()
+      }
       logInfo("MemoryStore cleared")
     }
   }
@@ -481,10 +494,12 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
           }
           // record access time for blockId in data structure
           logInfo(s"CMU - Usage data structure updated with new time entry. " +
-                  "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-          if(usage.get(blockId) == null)
-            usage.put(blockId, new LinkedList[Long]())
-          usage.get(blockId).add(System.currentTimeMillis())
+                  "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()) + "tryToPut")
+          usage.synchronized{
+            if(usage.get(blockId) == null)
+              usage.put(blockId, new LinkedList[Long]())
+            usage.get(blockId).add(System.currentTimeMillis())
+          }
           lastEntryAccessTime.set(0, System.currentTimeMillis())
         }
         val valuesOrBytes = if (deserialized) "values" else "bytes"
@@ -632,6 +647,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
     val actualFreeMemory = freeMemory - currentUnrollMemory +
       pendingUnrollMemoryMap.getOrElse(threadId, 0L)
 
+    getEntry(blockIdToAdd)
     //if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
@@ -647,13 +663,16 @@ private[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         for (blockId <- selectedBlocks) {
           logInfo(s"dropping block: " + String.valueOf(blockId))
           synchronized {
-            val entry = entries.synchronized { getEntry(blockId) }
+            //val entry = entries.synchronized { getEntry(blockId) }
+            val entry = entries.get(blockId)
             // record access time for blockId in data structure
             logInfo(s"CMU - Usage data structure updated with new time entry. " +
-                    "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis()))
-            if(usage.get(blockId) == null)
-              usage.put(blockId, new LinkedList[Long]())
-            usage.get(blockId).add(System.currentTimeMillis())
+                    "Block $blockId acessed at time %s" + String.valueOf(System.currentTimeMillis())+ "ensureFreeSpace")
+            usage.synchronized{
+              if(usage.get(blockId) == null)
+                usage.put(blockId, new LinkedList[Long]())
+              usage.get(blockId).add(System.currentTimeMillis())
+            }
             lastEntryAccessTime.set(0, System.currentTimeMillis())
             ///////////////////////////////////////////////////
             //writeUsageInfo()
