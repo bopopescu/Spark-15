@@ -19,9 +19,10 @@ object InteractiveWorkloadTest {
 
   def main(args: Array[String]) {
   	
+    val iterations = if (args.length > 0) args(0).toInt else ITERATIONS
     val conf = new SparkConf().setAppName("Interactive Workload")
     implicit val spark = new SparkContext(conf)
-    class PiInteractiveWorkload extends InteractiveWorkload(ITERATIONS, CONCURRENT_WORKLOADS, MAX_WAIT_TIME, MIN_WAIT_TIME) with PiApproximation
+    class PiInteractiveWorkload extends InteractiveWorkload(iterations, CONCURRENT_WORKLOADS, MAX_WAIT_TIME, MIN_WAIT_TIME) with PiApproximation
     val pi = new PiInteractiveWorkload
     pi.concurrentWorkload()
 

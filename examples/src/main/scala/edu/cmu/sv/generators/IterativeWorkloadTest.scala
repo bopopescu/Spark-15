@@ -16,10 +16,11 @@ object IterativeWorkloadTest {
 
   def main(args: Array[String]) {
   	
+    val iterations = if (args.length > 0) args(0).toInt else ITERATIONS
     val conf = new SparkConf().setAppName("Iterative Workload")
     implicit val spark = new SparkContext(conf)
 
-    class PiIterativeWorkload extends IterativeWorkload(ITERATIONS, SLEEP_MILLIS) with PiApproximation
+    class PiIterativeWorkload extends IterativeWorkload(iterations, SLEEP_MILLIS) with PiApproximation
     val pi = new PiIterativeWorkload
     pi.iterativeWorkload()
 

@@ -22,12 +22,13 @@ object RandomWorkloadTest {
 
   def main(args: Array[String]) {
   	
+    val iterations = if (args.length > 0) args(0).toInt else RANDOM_ITERATIONS
     val conf = new SparkConf().setAppName("Random Workload")
     implicit val spark = new SparkContext(conf)
 
     class PiInteractiveWorkload extends InteractiveWorkload(CONCURRENT_ITERATIONS, CONCURRENT_WORKLOADS, CONCURRENT_MIN_WAIT_TIME, CONCURRENT_MAX_WAIT_TIME) with PiApproximation
     class PiIterativeWorkload extends IterativeWorkload(ITERATIVE_ITERATIONS, ITERATIVE_SLEEP_MILLIS) with PiApproximation
-    class PiRandomWorkload extends RandomWorkload(RANDOM_ITERATIONS, new PiInteractiveWorkload(), new PiIterativeWorkload())
+    class PiRandomWorkload extends RandomWorkload(iterations, new PiInteractiveWorkload(), new PiIterativeWorkload())
 
     val pi = new PiRandomWorkload
     pi.randomWorkload()
