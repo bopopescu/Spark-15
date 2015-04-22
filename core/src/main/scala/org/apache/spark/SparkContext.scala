@@ -217,6 +217,10 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     System.setProperty("CMU_USEBAYES_FLAG", "true")
   }
 
+  if (conf.contains("spark.app.name")) {
+    System.setProperty("CMU_APP_NAME", conf.get("spark.app.name"))
+  }
+
   // Set Spark driver host and port system properties
   conf.setIfMissing("spark.driver.host", Utils.localHostName())
   conf.setIfMissing("spark.driver.port", "0")
@@ -547,12 +551,12 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   private val dagSchedulerSource = new DAGSchedulerSource(this.dagScheduler)
   private val blockManagerSource = new BlockManagerSource(SparkEnv.get.blockManager)
   //added by qihao
-  private val memoryStoreSource = new MemoryStoreSource(SparkEnv.get.blockManager.memoryStore)
+  // private val memoryStoreSource = new MemoryStoreSource(SparkEnv.get.blockManager.memoryStore)
 
   private def initDriverMetrics() {
     SparkEnv.get.metricsSystem.registerSource(dagSchedulerSource)
     SparkEnv.get.metricsSystem.registerSource(blockManagerSource)
-    SparkEnv.get.metricsSystem.registerSource(memoryStoreSource)
+    // SparkEnv.get.metricsSystem.registerSource(memoryStoreSource)
   }
 
   initDriverMetrics()
