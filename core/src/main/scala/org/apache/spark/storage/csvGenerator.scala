@@ -25,13 +25,13 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     var preLastTime = 0L
     var index = 0
     
-    var usageOutputFileName = "core/segment1.data"
-    if(jobName == "iterative")
-      usageOutputFileName = "core/segment1.data"
-    else if (jobName == "interactive")
-      usageOutputFileName = "core/segment2.data"
-    else if(jobName == "combination")
-      usageOutputFileName = "core/segment3.data"
+    var usageOutputFileName = "segment1.data"
+    if(jobName == "Iterative Workload")
+      usageOutputFileName = "segment1.data"
+    else if (jobName == "Interactive Workload")
+      usageOutputFileName = "segment2.data"
+    else if(jobName == "Combination Workload")
+      usageOutputFileName = "segment3.data"
     
     println(s"CMU - Usage information written to csv file ")
 
@@ -72,6 +72,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     
+    out.write("1,1,1,1\n")
+    out_record.write("1,1,1,1\n")
+    out.flush()
+    out_record.flush()
+    
     breakable {
       while(true) {
         entries.synchronized {
@@ -90,14 +95,17 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
             val time1 = usages(0)
             val size = usages.size
             val freq = 1000.0 * size / (currTime - time1)
-            val blockSize = entries.getNoUsage(blockId).size
-            val ratio = 1.0 * usages(size-1) / currTime
-            val label = new Random().nextInt(100)
-            str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
-            out.write(str)
-            out_record.write(str)
-            out.flush()
-            out_record.flush()
+            val blockEntries = entries.getNoUsage(blockId)
+            if (blockEntries != null) {
+              val blockSize = blockEntries.size
+              val ratio = 1.0 * usages(size-1) / currTime
+              val label = new Random().nextDouble() * 100
+              str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
+              out.write(str)
+              out_record.write(str)
+              out.flush()
+              out_record.flush()
+            }
           }
 
           if(preLastTime == lastTime)

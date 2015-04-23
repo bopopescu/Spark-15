@@ -12,8 +12,8 @@ import scala.util.Random
  */
 object RandomWorkloadTest {
 
-  final val RANDOM_ITERATIONS = 5000
-  final val ITERATIVE_ITERATIONS = 100
+  final val RANDOM_ITERATIONS = 50
+  final val ITERATIVE_ITERATIONS = 50
   final val ITERATIVE_SLEEP_MILLIS = 1000
   final val CONCURRENT_ITERATIONS = 1
   final val CONCURRENT_WORKLOADS = 5

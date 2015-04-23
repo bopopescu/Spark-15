@@ -48,17 +48,18 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   override val entries = new EnrichedLinkedHashMap[BlockId, MemoryEntry]
 	
   val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
+  logInfo(s"==============useBayes===========" + String.valueOf(useBayes))
   var dataset : DataSet = null
   var eva : Evaluation = null
   
-  val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","iterative"))
+  val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","Iterative Workload"))
   var selectedInputFile = "segment1.data"
   
-  if(jobName == "iterative")
+  if(jobName == "Iterative Workload")
     selectedInputFile = "segment1.data"
-  else if (jobName =="interactive")
+  else if (jobName =="Interactive Workload")
     selectedInputFile = "segment2.data"
-  else if(jobName == "combination")
+  else if(jobName == "Combination Workload")
     selectedInputFile = "segment3.data"
 
   //create the bayes classifier.
@@ -79,7 +80,9 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     rddToAdd: Option[Int],
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
-
+    
+    logInfo(s"fucccccccckkkkkkkkkkkkkkkkk==-=-=-=-=--=-=--==--=")
+    
     if(useBayes)
       naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     else
@@ -94,10 +97,12 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
 
+    logInfo(s"====================naiveBayesFindBlocksToReplace==========")
+    
     var resultSelectedMemory = selectedMemory
     synchronized {
       entries.synchronized {
-        while (actualFreeMemory + selectedMemory < space && entries.usage.toIterator.hasNext) {
+        while (actualFreeMemory + resultSelectedMemory < space && entries.usage.toIterator.hasNext) {
           var usageIterator = entries.usage.toIterator
           if(usageIterator.hasNext) {
             var (usageBlockId, blockUsage) = usageIterator.next()        
@@ -147,7 +152,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     var resultSelectedMemory = selectedMemory
     entries.synchronized {
       val iterator = entries.entrySet().iterator()
-      while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
+      while (actualFreeMemory + resultSelectedMemory < space && iterator.hasNext) {
         val pair = iterator.next()
         val blockId = pair.getKey
         if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
@@ -162,9 +167,9 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   protected override def ensureFreeSpace(
       blockIdToAdd: BlockId,
       space: Long): ResultWithDroppedBlocks = {
-    logInfo(s"ensureFreeSpace($space) called with curMem=$currentMemory, maxMem=$maxMemory")
 
     val droppedBlocks = new ArrayBuffer[(BlockId, BlockStatus)]
+    logInfo(s"ensureFreeSpace new!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
     if (space > maxMemory) {
       logInfo(s"Will not store $blockIdToAdd as it is larger than our memory limit")
@@ -174,11 +179,11 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     // Take into account the amount of memory currently occupied by unrolling blocks
     val actualFreeMemory = freeMemory - currentUnrollMemory
 
-    //if (actualFreeMemory < space) {
+    if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]
       var selectedMemory = 0L      
-
+      
       findBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)      
 
       if (actualFreeMemory + selectedMemory >= space) {
@@ -204,7 +209,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
           "from the same RDD")
         return ResultWithDroppedBlocks(success = false, droppedBlocks)
       }
-    //}
+    }
     ResultWithDroppedBlocks(success = true, droppedBlocks)
   }
 

@@ -12,7 +12,7 @@ import scala.util.Random
  */
 object InteractiveWorkloadTest {
 
-  final val ITERATIONS = 1000
+  final val ITERATIONS = 50
   final val CONCURRENT_WORKLOADS = 5
   final val MIN_WAIT_TIME = 1000
   final val MAX_WAIT_TIME = 10000
