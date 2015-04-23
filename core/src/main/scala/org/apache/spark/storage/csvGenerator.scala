@@ -113,7 +113,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           else 
             count = 0;
 
-          if(count >= 10)
+          if(count >= 15)
             break
 
           preLastTime = lastTime          
