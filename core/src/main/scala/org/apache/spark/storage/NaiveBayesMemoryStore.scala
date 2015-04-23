@@ -80,9 +80,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     rddToAdd: Option[Int],
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
-    
-    logInfo(s"fucccccccckkkkkkkkkkkkkkkkk==-=-=-=-=--=-=--==--=")
-    
+        
     if(useBayes)
       naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     else
