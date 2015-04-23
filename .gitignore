@@ -1,6 +1,7 @@
 *.data
-usageHistory.csv
+*.csv
 HitRate
+HitRate.txt
 *~
 *.#*
 *#*#
