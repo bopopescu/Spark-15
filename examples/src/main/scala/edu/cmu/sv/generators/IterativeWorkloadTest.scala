@@ -20,9 +20,16 @@ object IterativeWorkloadTest {
     val conf = new SparkConf().setAppName("Iterative Workload")
     implicit val spark = new SparkContext(conf)
 
-    class PiIterativeWorkload extends IterativeWorkload(iterations, SLEEP_MILLIS) with PiApproximation
-    val pi = new PiIterativeWorkload
-    pi.iterativeWorkload()
+    if (args.length > 1 && args(1) == "trace") {
+      class TraceIterativeWorkload extends IterativeWorkload(iterations, SLEEP_MILLIS) with GoogleTraceTaskUsage
+      val trace = new TraceIterativeWorkload
+      trace.iterativeWorkload()
+    }
+    else {
+      class PiIterativeWorkload extends IterativeWorkload(iterations, SLEEP_MILLIS) with PiApproximation
+      val pi = new PiIterativeWorkload
+      pi.iterativeWorkload()
+    }
 
     Thread.sleep(10000)
     

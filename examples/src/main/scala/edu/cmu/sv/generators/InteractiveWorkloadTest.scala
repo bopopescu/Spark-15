@@ -22,9 +22,17 @@ object InteractiveWorkloadTest {
     val iterations = if (args.length > 0) args(0).toInt else ITERATIONS
     val conf = new SparkConf().setAppName("Interactive Workload")
     implicit val spark = new SparkContext(conf)
-    class PiInteractiveWorkload extends InteractiveWorkload(iterations, CONCURRENT_WORKLOADS, MAX_WAIT_TIME, MIN_WAIT_TIME) with PiApproximation
-    val pi = new PiInteractiveWorkload
-    pi.concurrentWorkload()
+
+    if (args.length > 1 && args(1) == "trace") {
+      class TraceInteractiveWorkload extends InteractiveWorkload(iterations, CONCURRENT_WORKLOADS, MAX_WAIT_TIME, MIN_WAIT_TIME) with GoogleTraceTaskUsage
+      val trace = new TraceInteractiveWorkload
+      trace.concurrentWorkload()
+    }
+    else {
+      class PiInteractiveWorkload extends InteractiveWorkload(iterations, CONCURRENT_WORKLOADS, MAX_WAIT_TIME, MIN_WAIT_TIME) with PiApproximation
+      val pi = new PiInteractiveWorkload
+      pi.concurrentWorkload()
+    }
 
     Thread.sleep(10000)
     

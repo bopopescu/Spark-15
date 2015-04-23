@@ -3,8 +3,9 @@ package org.apache.spark.storage
 import NaiveBayes._
 import scala.collection.mutable.{LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer
+import org.apache.spark.Logging
 
-private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap[A, B] {
+private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap[A, B] with Logging {
 
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
   val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
@@ -34,7 +35,7 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
     b
 	}
 
-	override def put(a:A, b:B):B = {		
+	override def put(a:A, b:B):B = {
     addUsage(a)
     super.put(a, b)
 	}

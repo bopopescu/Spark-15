@@ -2,8 +2,9 @@ package edu.cmu.sv.generators
 
 import scala.math.random
 import org.apache.spark._
+import scala.util.Try
 
-abstract class WorkloadGenerator {
+abstract class WorkloadGenerator extends java.io.Serializable {
   def generateWorkload()(implicit spark:SparkContext): Double
 }
 
@@ -23,5 +24,42 @@ trait PiApproximation extends WorkloadGenerator {
     }.reduce(_ + _)
     4.0 * count / n  
 	}
+
+}
+
+trait GoogleTraceTaskUsage extends WorkloadGenerator {
+
+  case class TaskUsage(
+      startTime:Long,
+      endtime:Long,
+      jobID:Long,
+      taskIndex:Long,
+      machineId:Long,
+      meanCPUUsageTime:Double,
+      canonicalMemoryUsage:Double,
+      assignedMemoryUsage:Double,
+      unamppedPageUsage:Double,
+      totalPageCacheMemoryUsage:Double,
+      maxMemoryUsage:Double,
+      meanDiskIOTime:Double,
+      meanLocalDiskSpaceDouble:Double,
+      maxCPUUsage:Double,
+      maxDiskIIOTime:Double,
+      cPI:Double,
+      memAccessPerInstruction:Double,
+      samplePortion:Double,
+      aggregationType:Double,
+      sampledCPUUsage:Double)
+
+  def generateWorkload()(implicit spark:SparkContext):Double = {
+
+    val part0 = spark.textFile("file:///tmp/part-00000-of-00500.csv")
+    val taskUsage = part0.map(_.split(",")).flatMap(row => Try(TaskUsage(
+      row(0).toLong, row(1).toLong, row(2).toLong, row(3).toLong, row(4).toLong, row(5).toDouble, row(6).toDouble, row(7).toDouble, row(8).toDouble,
+      row(9).toDouble, row(10).toDouble, row(11).toDouble, row(12).toDouble, row(13).toDouble, row(14).toDouble, row(15).toDouble, row(16).toDouble,
+      row(17).toDouble, row(18).toDouble, row(19).toDouble)).toOption
+    )
+    taskUsage.map(_.meanCPUUsageTime).mean()    
+  }
 
 }

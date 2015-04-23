@@ -26,12 +26,20 @@ object RandomWorkloadTest {
     val conf = new SparkConf().setAppName("Random Workload")
     implicit val spark = new SparkContext(conf)
 
-    class PiInteractiveWorkload extends InteractiveWorkload(CONCURRENT_ITERATIONS, CONCURRENT_WORKLOADS, CONCURRENT_MIN_WAIT_TIME, CONCURRENT_MAX_WAIT_TIME) with PiApproximation
-    class PiIterativeWorkload extends IterativeWorkload(ITERATIVE_ITERATIONS, ITERATIVE_SLEEP_MILLIS) with PiApproximation
-    class PiRandomWorkload extends RandomWorkload(iterations, new PiInteractiveWorkload(), new PiIterativeWorkload())
-
-    val pi = new PiRandomWorkload
-    pi.randomWorkload()
+    if (args.length > 1 && args(1) == "trace") {
+      class TraceInteractiveWorkload extends InteractiveWorkload(CONCURRENT_ITERATIONS, CONCURRENT_WORKLOADS, CONCURRENT_MIN_WAIT_TIME, CONCURRENT_MAX_WAIT_TIME) with GoogleTraceTaskUsage
+      class TraceIterativeWorkload extends IterativeWorkload(ITERATIVE_ITERATIONS, ITERATIVE_SLEEP_MILLIS) with GoogleTraceTaskUsage
+      class TraceRandomWorkload extends RandomWorkload(iterations, new TraceInteractiveWorkload(), new TraceIterativeWorkload())
+      val trace = new TraceRandomWorkload
+      trace.randomWorkload()
+    }
+    else {
+      class PiInteractiveWorkload extends InteractiveWorkload(CONCURRENT_ITERATIONS, CONCURRENT_WORKLOADS, CONCURRENT_MIN_WAIT_TIME, CONCURRENT_MAX_WAIT_TIME) with PiApproximation
+      class PiIterativeWorkload extends IterativeWorkload(ITERATIVE_ITERATIONS, ITERATIVE_SLEEP_MILLIS) with PiApproximation
+      class PiRandomWorkload extends RandomWorkload(iterations, new PiInteractiveWorkload(), new PiIterativeWorkload())
+      val pi = new PiRandomWorkload
+      pi.randomWorkload()
+    }
 
     Thread.sleep(10000)
     
