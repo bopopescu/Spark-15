@@ -68,10 +68,12 @@ protected[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
   logInfo("MemoryStore started with capacity %s".format(Utils.bytesToString(maxMemory)))
 
+
   /** Free memory not occupied by existing blocks. Note that this does not include unroll memory. */
   def freeMemory: Long = maxMemory - currentMemory
 
   override def getSize(blockId: BlockId): Long = {
+
     entries.synchronized {
       entries.get(blockId).size
     }
@@ -153,6 +155,7 @@ protected[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   }
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
+
     val entry = entries.synchronized {
       entries.get(blockId)
     }
@@ -180,6 +183,7 @@ protected[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
   }
 
   override def remove(blockId: BlockId): Boolean = {
+
     entries.synchronized {
       val entry = entries.remove(blockId)
       if (entry != null) {
@@ -188,6 +192,7 @@ protected[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
         true
       } else {
         false
+
       }
     }
   }
@@ -382,7 +387,6 @@ protected[spark] class MemoryStore(blockManager: BlockManager, maxMemory: Long)
 
     // Take into account the amount of memory currently occupied by unrolling blocks
     val actualFreeMemory = freeMemory - currentUnrollMemory
-
     if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)
       val selectedBlocks = new ArrayBuffer[BlockId]

@@ -11,7 +11,7 @@ import org.apache.spark._
  */
 object IterativeWorkloadTest {
 
-  final val ITERATIONS = 5000
+  final val ITERATIONS = 50
   final val SLEEP_MILLIS = 1000
 
   def main(args: Array[String]) {

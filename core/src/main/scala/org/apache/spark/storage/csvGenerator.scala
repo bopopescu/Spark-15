@@ -18,7 +18,7 @@ import java.io.PrintWriter
  *    you can also use --master local[512]
  */
 class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:String) extends Thread {
-  
+ 
   override def run {
 
     var count = 0
@@ -33,14 +33,12 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     else if(jobName == "combination")
       usageOutputFileName = "core/segment3.data"
     
-    println(s"CMU - Usage information written to csv file ")    
-    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
-    
-    println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
+    println(s"CMU - Usage information written to csv file ")
 
-    if(Files.exists(Paths.get("HitRate"))) {
-      val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate")))
+    try{
+      val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate.txt")))
       var str = inHitRate.readLine()
+      println(s"######################################## Name: " + getName() + " ########################################")
       while(str != null) {
         str = str.trim()
         if(str.length() > 0) {
@@ -51,8 +49,29 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
       }
       index = index + 1
       inHitRate.close()
+    } 
+    catch{
+      case ex : IOException => {
+        println(s"######################################## Creating Hitrate.txt ########################################")
+        val newFile = new File("HitRate.txt")
+        newFile.createNewFile()
+        index = index + 1
+      }
     }
 
+    val dirName = "usageHistoryRecord"
+    val fileName = dirName + "/usageHistory_" + index + ".csv"
+
+    val dir = new File(dirName)
+    if(!dir.exists()) {
+      dir.mkdirs()
+    }
+
+    val out_record = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))
+    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
+
+    println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
+    
     breakable {
       while(true) {
         entries.synchronized {
@@ -62,20 +81,23 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           println(s"######################################## time: " + currTime + " ########################################")
           println(s"######################################## usage size: " + String.valueOf(entries.usage.size) + " ########################################")
           println(s"######################################## hitMiss size: " + String.valueOf(entries.hitMiss.size) + " ########################################")
+          println(s"######################################## count: " + String.valueOf(count) + " ########################################")
 
           val iteratorU = entries.usage.toIterator
-          while (iteratorU.hasNext) {
+          while (iteratorU != null && iteratorU.hasNext) {
             var str = ""
             val (blockId, usages) = iteratorU.next()          
             val time1 = usages(0)
-            val count = usages.size
-            val freq = 1000.0 * count / (currTime - time1)
+            val size = usages.size
+            val freq = 1000.0 * size / (currTime - time1)
             val blockSize = entries.getNoUsage(blockId).size
-            val ratio = 1.0 * usages(count-1) / currTime
+            val ratio = 1.0 * usages(size-1) / currTime
             val label = new Random().nextInt(100)
             str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
             out.write(str)
+            out_record.write(str)
             out.flush()
+            out_record.flush()
           }
 
           if(preLastTime == lastTime)
@@ -83,7 +105,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           else 
             count = 0;
 
-          if(count >= 5)
+          if(count >= 10)
             break
 
           preLastTime = lastTime          
@@ -91,10 +113,13 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
         Thread.sleep(1000)
       }
     }
+    out.close()
+    out_record.close()
 
     //calculate the hit rate
+    println(s"######################################## Writing Hitrate ########################################")
     entries.synchronized {
-      val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate", true)))
+      val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt", true)))
       val iteratorH = entries.hitMiss.toIterator
       var hitCount = 0
       var totalSize = 0
@@ -109,12 +134,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
       }
       val hitRate = 1.0 * hitCount / totalSize
       var hitRateRst = ""
-      hitRateRst = hitRateRst + index + "\t" + hitRate + "\n"
+      
+      hitRateRst = hitRateRst + index + "\t" + jobName + "\t" + hitRate + "\n"
       outHitRate.write(hitRateRst)
-
-      out.close()
+      println(s"######################################## Finish Writing Hitrate ########################################")
       outHitRate.close()
     }
-    
   }
 }
