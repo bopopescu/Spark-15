@@ -8,7 +8,7 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
 
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
   val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
-  var lastEntryAccessTime:Long = 0
+  var lastEntryAccessTime:Long = 0L
 
   private def addUsage(a: A) {
     lastEntryAccessTime = System.currentTimeMillis
@@ -36,6 +36,7 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
 
 	override def put(a:A, b:B):B = {		
     addUsage(a)
+    addHitMiss(a, false)
     super.put(a, b)
 	}
 }
@@ -95,61 +96,39 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     var resultSelectedMemory = selectedMemory
     synchronized {
       entries.synchronized {
-        val cmuEntries = entries.entrySet()
-        val iterator = cmuEntries.iterator()
-
-        while (actualFreeMemory + selectedMemory < space && iterator.hasNext) {
-          val pair = iterator.next()
-          val blockId = pair.getKey
-          val blockUsage = entries.usage.getOrElse(blockId, new ArrayBuffer[Long](0))
-          if (rddToAdd.isEmpty || rddToAdd != getRddId(blockId)) {
-            logInfo(s"########################## blockId is $blockId ##############")
-            selectedBlocks += blockId
-            resultSelectedMemory += pair.getValue.size
-            logInfo(s"Block: " + String.valueOf(blockId)
-                + s" timeLine: " + String.valueOf(blockUsage(0))
-                + s" access frequency: " + String.valueOf(blockUsage.size));
-          }
-        }
-      }
-
-      logInfo(s"----------------------------test for bayse------------------------")
-      while (actualFreeMemory + selectedMemory < space && entries.usage.toIterator.hasNext) {
-        var usageIterator = entries.usage.toIterator
-        if(usageIterator.hasNext) {
-          var (usageBlockId, blockUsage) = usageIterator.next()        
-          val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
-          var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size, lastAccess))
-          logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-            + s" frequency:" + String.valueOf(blockUsage.size)
-            + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-            + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
-            + s" predict:" + String.valueOf(predict))
-
-          while(usageIterator.hasNext) {
-            var (usageTempBlockId, blockUsage) = usageIterator.next()
-            var tempPredict = eva.predict(Array(blockUsage.size, entries.get(usageBlockId).size, lastAccess))
+        while (actualFreeMemory + selectedMemory < space && entries.usage.toIterator.hasNext) {
+          var usageIterator = entries.usage.toIterator
+          if(usageIterator.hasNext) {
+            var (usageBlockId, blockUsage) = usageIterator.next()        
+            val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
+            var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size, lastAccess))
             logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-            + s" frequency:" + String.valueOf(blockUsage.size)
-            + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-            + s" last access rate:" + String.valueOf((blockUsage.last * 1.0) / (System.currentTimeMillis() * 1.0)) 
-            + s" predict:" + String.valueOf(predict))
-            if(predict > tempPredict) {
-              predict = tempPredict
-              usageBlockId = usageTempBlockId
+              + s" frequency:" + String.valueOf(blockUsage.size)
+              + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+              + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
+              + s" predict:" + String.valueOf(predict))
+
+            while(usageIterator.hasNext) {
+              var (usageTempBlockId, blockUsage) = usageIterator.next()
+              var tempPredict = eva.predict(Array(blockUsage.size, entries.get(usageBlockId).size, lastAccess))
+              logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+              + s" frequency:" + String.valueOf(blockUsage.size)
+              + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+              + s" last access rate:" + String.valueOf((blockUsage.last * 1.0) / (System.currentTimeMillis() * 1.0)) 
+              + s" predict:" + String.valueOf(predict))
+              if(predict > tempPredict) {
+                predict = tempPredict
+                usageBlockId = usageTempBlockId
+              }
             }
+            selectedBlocks += usageBlockId
+            resultSelectedMemory += entries.getNoUsage(usageBlockId).size
+            logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+              + s" timeLine: " + String.valueOf(blockUsage.last)
+              + s" access frequency: " + String.valueOf(blockUsage.size));
           }
-          selectedBlocks += usageBlockId
-          resultSelectedMemory += entries.getNoUsage(usageBlockId).size
-          entries.removeUsageEntries(usageBlockId)
-          logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-            + s" timeLine: " + String.valueOf(blockUsage.last)
-            + s" access frequency: " + String.valueOf(blockUsage.size));
         }
       }
-      logInfo(s"----------------------------test end------------------------")
-    // TODO: utilize usage structure
-    
     }
     resultSelectedMemory
   }
@@ -226,5 +205,14 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
       }
     //}
     ResultWithDroppedBlocks(success = true, droppedBlocks)
+  }
+
+  override def remove(blockId: BlockId): Boolean = {
+    logInfo(s"======================remove=======================")
+    entries.synchronized {
+      entries.removeUsageEntries(blockId)
+      
+      super.remove(blockId)
+    }
   }
 }

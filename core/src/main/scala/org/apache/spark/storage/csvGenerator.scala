@@ -8,7 +8,7 @@ import scala.math.random
 import org.apache.spark._
 import scala.util.Random
 import scala.util.control.Breaks._
-
+import java.nio.file.{Paths, Files}
 import java.io.PrintWriter
 
 /* 
@@ -20,9 +20,12 @@ import java.io.PrintWriter
 class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:String) extends Thread {
  
   override def run {
+
+    var count = 0
+    var preLastTime = 0L
+    var index = 0
     
     var usageOutputFileName = "core/segment1.data"
-    
     if(jobName == "iterative")
       usageOutputFileName = "core/segment1.data"
     else if (jobName == "interactive")
@@ -32,15 +35,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     
     println(s"CMU - Usage information written to csv file ")
 
-    var count = 0
-    var preLastTime = 0L
-    var index = 0
-
     try{
       val inHitRate = new BufferedReader(new InputStreamReader(new FileInputStream("HitRate.txt")))
       var str = inHitRate.readLine()
+      println(s"######################################## Name: " + getName() + " ########################################")
       while(str != null) {
-        println(s"######################################## Name: " + getName() + " ########################################")
         str = str.trim()
         if(str.length() > 0) {
           var strArr = str.split("\t")
@@ -70,13 +69,12 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
 
     val out_record = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))
     val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
-    
 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     
     breakable {
-      entries.synchronized {
-        while(true) {
+      while(true) {
+        entries.synchronized {
           val currTime = System.currentTimeMillis()
           var lastTime = entries.lastEntryAccessTime
           println(s"######################################## Name: " + getName() + " ########################################")
@@ -86,14 +84,14 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           println(s"######################################## count: " + String.valueOf(count) + " ########################################")
 
           val iteratorU = entries.usage.toIterator
-          while (iteratorU.hasNext) {
+          while (iteratorU != null && iteratorU.hasNext) {
             var str = ""
             val (blockId, usages) = iteratorU.next()          
             val time1 = usages(0)
-            val count = usages.size
-            val freq = 1000.0 * count / (currTime - time1)
+            val size = usages.size
+            val freq = 1000.0 * size / (currTime - time1)
             val blockSize = entries.getNoUsage(blockId).size
-            val ratio = 1.0 * usages(count-1) / currTime
+            val ratio = 1.0 * usages(size-1) / currTime
             val label = new Random().nextInt(100)
             str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
             out.write(str)
@@ -110,9 +108,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           if(count >= 10)
             break
 
-          preLastTime = lastTime
-          Thread.sleep(1000)
+          preLastTime = lastTime          
         }
+        Thread.sleep(1000)
       }
     }
     out.close()

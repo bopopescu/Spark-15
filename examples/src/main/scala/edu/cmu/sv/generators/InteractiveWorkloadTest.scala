@@ -26,6 +26,8 @@ object InteractiveWorkloadTest {
     val pi = new PiInteractiveWorkload
     pi.concurrentWorkload()
 
+    Thread.sleep(10000)
+    
     spark.stop()
   }
 }
