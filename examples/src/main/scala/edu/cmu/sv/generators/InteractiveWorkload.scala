@@ -6,6 +6,8 @@ import scala.util.Random
 
 abstract class InteractiveWorkload(iterations:Int, concurrentWorkload:Int, maxWaitTime:Int, minWaitTime:Int) extends WorkloadGenerator {
 
+  final val MAX_RDDs = 5
+
   class Workload(_spark:SparkContext) extends Thread {
 
     implicit val spark = _spark
@@ -13,7 +15,7 @@ abstract class InteractiveWorkload(iterations:Int, concurrentWorkload:Int, maxWa
 
     override def run {
       Thread.sleep(math.max(new Random().nextInt(maxWaitTime), minWaitTime))
-      pi = generateWorkload
+      pi = generateWorkload(new Random().nextInt(MAX_RDDs))
     }
   }
 
