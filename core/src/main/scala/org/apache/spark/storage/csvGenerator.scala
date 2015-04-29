@@ -19,6 +19,8 @@ import java.io.PrintWriter
  */
 class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:String) extends Thread {
  
+  final val K = 1.0 // contants for tunning
+ 
   override def run {
 
     var count = 0
@@ -59,64 +61,94 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
       }
     }
 
-    val dirName = "usageHistoryRecord"
-    val fileName = dirName + "/usageHistory_" + index + ".csv"
+    // val dirName = "usageHistoryRecord"
+    // val fileName = dirName + "/usageHistory_" + index + ".csv"
 
-    val dir = new File(dirName)
-    if(!dir.exists()) {
-      dir.mkdirs()
-    }
+    // val dir = new File(dirName)
+    // if(!dir.exists()) {
+    //   dir.mkdirs()
+    // }
 
-    val out_record = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))
-    val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
+    // val out_record = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName)))
+    // val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(usageOutputFileName))))
 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     
-    out.write("1,1,1,1\n")
-    out_record.write("1,1,1,1\n")
-    out.flush()
-    out_record.flush()
+    // out.write("1,1,1,1\n")
+    // out_record.write("1,1,1,1\n")
+    // out.flush()
+    // out_record.flush()
     
     breakable {
       while(true) {
         entries.synchronized {
           val currTime = System.currentTimeMillis()
           var lastTime = entries.lastEntryAccessTime
-          println(s"######################################## Name: " + getName() + " ########################################")
-          println(s"######################################## time: " + currTime + " ########################################")
-          println(s"######################################## usage size: " + String.valueOf(entries.usage.size) + " ########################################")
-          println(s"######################################## hitMiss size: " + String.valueOf(entries.hitMiss.size) + " ########################################")
-          println(s"######################################## count: " + String.valueOf(count) + " ########################################")
-
+          
+          //get the total memory access frequency in one second.
           val iteratorU = entries.usage.toIterator
+          var sumFreq = 0
           while (iteratorU != null && iteratorU.hasNext) {
-            var str = ""
-            val (blockId, usages) = iteratorU.next()          
-            val time1 = usages(0)
-            val size = usages.size
-            val freq = 1000.0 * size / (currTime - time1)
-            val blockEntries = entries.getNoUsage(blockId)
-            if (blockEntries != null) {
-              val blockSize = blockEntries.size
-              val ratio = 1.0 * usages(size-1) / currTime
-              val label = new Random().nextDouble() * 100
-              str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
-              out.write(str)
-              out_record.write(str)
-              out.flush()
-              out_record.flush()
-            }
+            val (blockId, usages) = iteratorU.next()
+            sumFreq += usages.size
           }
+          
+          val iterator = entries.usage.toIterator
+          var sumProb = 0.0
+          while(iterator != null && iterator.hasNext) {
+            val (blockId, usages) = iterator.next()
+            val freqIndi = usages.size                         //how many times this block been accessed, as f.
+            val expectedHitRate = (freqIndi - 1) / freqIndi    //expected maxisum ratio of hitrate, f-1/f.
+            val hitMissRatio = 1.0 //TODO: add read hit rate divided by expected hit rate.
+            val freqRatio = freqIndi / sumFreq                 //ratio that shows this block's intense.
+            val blockSize = entries.getNoUsage(blockId).size
+            val newProb = calculateNewProbability(entries.lastProb, blockId, freqRatio, hitMissRatio, blockSize)
+            sumProb += newProb
+            //TODO: store in data transportation structure.
+          }
+          
+          //TODO: add a loop for data transportation structure to calculate the prob range in [1, 100]
+          //function: (thisProb - minProb)/(maxProb - minProb)
+          
+          
+          // println(s"######################################## Name: " + getName() + " ########################################")
+          // println(s"######################################## time: " + currTime + " ########################################")
+          // println(s"######################################## usage size: " + String.valueOf(entries.usage.size) + " ########################################")
+          // println(s"######################################## hitMiss size: " + String.valueOf(entries.hitMiss.size) + " ########################################")
+          // println(s"######################################## count: " + String.valueOf(count) + " ########################################")
 
-          if(preLastTime == lastTime)
-            count = count + 1
-          else 
-            count = 0;
+          // val iteratorU = entries.usage.toIterator
+          // while (iteratorU != null && iteratorU.hasNext) {
+          //   var str = ""
+          //   val (blockId, usages) = iteratorU.next()          
+          //   val time1 = usages(0)
+          //   val size = usages.size
+          //   val freq = 1000.0 * size / (currTime - time1)
+          //   val blockEntries = entries.getNoUsage(blockId)
+          //   if (blockEntries != null) {
+          //     val blockSize = blockEntries.size
+          //     val ratio = 1.0 * usages(size-1) / currTime
+          //     val label = new Random().nextDouble() * 100
+          //     str = str + freq + "," + blockSize + "," + ratio + "," + label + "\n"
+          //     out.write(str)
+          //     out_record.write(str)
+          //     out.flush()
+          //     out_record.flush()
+          //   }
+          // }
 
-          if(count >= 15)
-            break
+          // if(preLastTime == lastTime)
+          //   count = count + 1
+          // else 
+          //   count = 0;
 
-          preLastTime = lastTime          
+          // if(count >= 15)
+          //   break
+
+          // preLastTime = lastTime      
+          
+          
+          
         }
         Thread.sleep(1000)
       }
@@ -148,5 +180,14 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
       println(s"######################################## Finish Writing Hitrate ########################################")
       outHitRate.close()
     }
+  }
+  
+  //reward function
+  private def calculateNewProbability(lastProb : LinkedHashMap[BlockId, Double], blockId : BlockId,
+    freqRatio : Double, hitMissRatio : Double, blockSize : Long) : Double = {
+    val k = K
+    val probChange = k * (freqRatio * blockSize) / hitMissRatio
+    val newProb = lastProb.get(blockId) + probChange
+    newProb
   }
 }
