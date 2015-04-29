@@ -7,13 +7,22 @@ abstract class IterativeWorkload(iterations:Int, sleepMillis:Int) extends Worklo
 
 	final val MAX_RDDs = 5
 
-  def iterativeWorkload()(implicit spark:SparkContext) {
-    for(i <- 1 to iterations) {
+	class Workload(_spark:SparkContext) extends Thread {
+
+    implicit val spark = _spark
+    var pi:Double = -1
+
+    override def run {
     	for(y <- 1 to MAX_RDDs) {
-    		println(s"iteration $i.$y - result is roughly: " + generateWorkload(y))	      
-    	}
-      Thread.sleep(sleepMillis)
+    		println(s"iteration $y - result is roughly: " + generateWorkload(y))
+    	}      
     }
+  }
+
+  def iterativeWorkload()(implicit spark:SparkContext) {
+  	val threads = List.fill(iterations)(new Workload(spark))
+  	threads.foreach(_.start)
+    threads.foreach(_.join)    
   }
 
 }
