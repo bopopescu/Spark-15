@@ -59,7 +59,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     selectedInputFile = "segment1.data"
   else if (jobName =="Interactive Workload")
     selectedInputFile = "segment2.data"
-  else if(jobName == "Combination Workload")
+  else if(jobName == "Random Workload")
     selectedInputFile = "segment3.data"
 
   //create the bayes classifier.

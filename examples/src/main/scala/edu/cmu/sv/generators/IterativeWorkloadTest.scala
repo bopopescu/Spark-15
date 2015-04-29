@@ -6,8 +6,7 @@ import org.apache.spark._
 /* 
  * generates an iterative workload
  * execute with: 
- *    ./bin/spark-submit --class edu.cmu.sv.generators.IterativeWorkloadTest --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 5
- *    you can also use --master local[512]
+ * ./bin/spark-submit --class edu.cmu.sv.generators.IterativeWorkloadTest --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 10 trace 1 /tmp/part-00000-of-00500.csv
  */
 object IterativeWorkloadTest {
 
@@ -21,7 +20,10 @@ object IterativeWorkloadTest {
     implicit val spark = new SparkContext(conf)
 
     if (args.length > 1 && args(1) == "trace") {
-      class TraceIterativeWorkload extends IterativeWorkload(iterations, SLEEP_MILLIS) with GoogleTraceTaskUsage
+      class TraceIterativeWorkload extends IterativeWorkload(iterations, SLEEP_MILLIS) with GoogleTraceTaskUsage {
+        override val nreads = args(2).toInt
+        // override val filepath = args(3)
+      }
       val trace = new TraceIterativeWorkload
       trace.iterativeWorkload()
     }

@@ -30,7 +30,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
       usageOutputFileName = "segment1.data"
     else if (jobName == "Interactive Workload")
       usageOutputFileName = "segment2.data"
-    else if(jobName == "Combination Workload")
+    else if(jobName == "Random Workload")
       usageOutputFileName = "segment3.data"
     
     println(s"CMU - Usage information written to csv file ")

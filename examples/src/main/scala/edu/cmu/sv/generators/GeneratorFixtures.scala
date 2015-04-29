@@ -2,10 +2,13 @@ package edu.cmu.sv.generators
 
 import scala.math.random
 import org.apache.spark._
+import org.apache.spark.rdd._
 import scala.util.Try
+import scala.collection.mutable.HashMap
 
 abstract class WorkloadGenerator extends java.io.Serializable {
-  def generateWorkload()(implicit spark:SparkContext): Double
+  val rdds = HashMap[Int, RDD[_]]()
+  def generateWorkload(rddId:Int)(implicit spark:SparkContext): Double
 }
 
 /** Computes an approximation to pi */
@@ -13,7 +16,7 @@ trait PiApproximation extends WorkloadGenerator {
 
 	//org.apache.spark.examples.SparkPi
 
-	def generateWorkload()(implicit spark:SparkContext) = {
+	def generateWorkload(rddId:Int)(implicit spark:SparkContext) = {
 		// val slices = if (args.length > 0) args(0).toInt else 2
 		val slices = 2
     val n = math.min(100000L * slices, Int.MaxValue).toInt // avoid overflow
@@ -28,6 +31,10 @@ trait PiApproximation extends WorkloadGenerator {
 }
 
 trait GoogleTraceTaskUsage extends WorkloadGenerator {
+
+  val nreads = 1
+  val filepath = "/tmp/part-00000-of-00500.csv"
+  private val file = "file://" + filepath
 
   case class TaskUsage(
       startTime:Long,
@@ -51,15 +58,26 @@ trait GoogleTraceTaskUsage extends WorkloadGenerator {
       aggregationType:Double,
       sampledCPUUsage:Double)
 
-  def generateWorkload()(implicit spark:SparkContext):Double = {
+  private def generateRDD()(implicit spark:SparkContext):RDD[_] = {
+    
+    val rdd = (0 to nreads).toList.foldLeft(spark.textFile(file)) { (r, i) =>
+      val tmp = spark.textFile(file)
+      r ++ tmp
+    }
 
-    val part0 = spark.textFile("file:///tmp/part-00000-of-00500.csv")
-    val taskUsage = part0.map(_.split(",")).flatMap(row => Try(TaskUsage(
+    val taskUsage = rdd.map(_.split(",")).flatMap(row => Try(TaskUsage(
       row(0).toLong, row(1).toLong, row(2).toLong, row(3).toLong, row(4).toLong, row(5).toDouble, row(6).toDouble, row(7).toDouble, row(8).toDouble,
       row(9).toDouble, row(10).toDouble, row(11).toDouble, row(12).toDouble, row(13).toDouble, row(14).toDouble, row(15).toDouble, row(16).toDouble,
       row(17).toDouble, row(18).toDouble, row(19).toDouble)).toOption
     )
-    taskUsage.map(_.meanCPUUsageTime).mean()    
+
+    taskUsage.persist()
+    taskUsage
+  }
+
+  def generateWorkload(rddId:Int)(implicit spark:SparkContext):Double = {
+    val rdd = rdds.getOrElseUpdate(rddId, generateRDD)
+    rdd.asInstanceOf[RDD[TaskUsage]].map(_.meanCPUUsageTime).mean()    
   }
 
 }

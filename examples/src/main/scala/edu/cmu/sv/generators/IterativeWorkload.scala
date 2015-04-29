@@ -5,9 +5,13 @@ import org.apache.spark._
 
 abstract class IterativeWorkload(iterations:Int, sleepMillis:Int) extends WorkloadGenerator {
 
+	final val MAX_RDDs = 5
+
   def iterativeWorkload()(implicit spark:SparkContext) {
     for(i <- 1 to iterations) {
-      println(s"iteration $i - result is roughly: " + generateWorkload)
+    	for(y <- 1 to MAX_RDDs) {
+    		println(s"iteration $i.$y - result is roughly: " + generateWorkload(y))	      
+    	}
       Thread.sleep(sleepMillis)
     }
   }
