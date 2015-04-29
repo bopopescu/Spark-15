@@ -59,10 +59,8 @@ trait GoogleTraceTaskUsage extends WorkloadGenerator {
       sampledCPUUsage:Double)
 
   private def generateRDD()(implicit spark:SparkContext):RDD[_] = {
-    
-    println("YOYOYOYOYOYOYOYOYOYOYOYOYOY")
-    val rdd = (1 to nreads).toList.foldLeft(spark.textFile(file)) { (r, i) =>
-      println("2YOYOYOYOYOYOYOYOYOYOYOYOYOY2")
+        
+    val rdd = (1 to nreads).toList.foldLeft(spark.textFile(file)) { (r, i) =>    
       val tmp = spark.textFile(file)
       r ++ tmp
     }
@@ -75,6 +73,7 @@ trait GoogleTraceTaskUsage extends WorkloadGenerator {
 
     // taskUsage.cache()
     // taskUsage
+    rdd.cache()
     rdd
   }
 

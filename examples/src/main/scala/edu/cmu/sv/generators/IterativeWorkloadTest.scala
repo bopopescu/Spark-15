@@ -6,7 +6,8 @@ import org.apache.spark._
 /* 
  * generates an iterative workload
  * execute with: 
- * ./bin/spark-submit --class edu.cmu.sv.generators.IterativeWorkloadTest --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 10 trace 1 /tmp/part-00000-of-00500.csv
+ * ./bin/spark-submit --class edu.cmu.sv.generators.IterativeWorkloadTest --executor-memory 512g --driver-memory 1g --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 10 trace 5
+ * ./bin/spark-submit --class edu.cmu.sv.generators.IterativeWorkloadTest --master local[1] --executor-memory 1g --driver-memory 2g ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 1 trace 10
  */
 object IterativeWorkloadTest {
 
