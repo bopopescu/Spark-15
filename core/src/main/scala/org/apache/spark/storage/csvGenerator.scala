@@ -158,17 +158,17 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
             //var strH = "" + secondsNum + "\t"
             var strH = ""
             val (blockId, list) = iteratorH.next()
-            var countT = 0
+            
             for(i <- 0 until list.size) {
               if(list(i) == true){
-                countT = countT + 1
+                strH = strH + blockId + ",1"
               }
+              else{
+                strH = strH + blockId + ",0"
+              }
+              outHitRate.write(strH)
+              outHitRate.flush()
             }
-            val totalSize = list.size
-            val rate = 1.0 * countT / totalSize
-            strH = strH + blockId + "," + countT + "," + rate
-            outHitRate.write(strH)
-            outHitRate.flush()
           }
 
           // if(preLastTime == lastTime)
