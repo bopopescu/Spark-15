@@ -120,6 +120,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
             trainRecord += ratio
             trainRecord += newProb
             entries.trainStructure += trainRecord
+            
           }
           
           //TODO: add a loop for data transportation structure to calculate the prob range in [1, 100]
