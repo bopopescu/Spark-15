@@ -10,6 +10,7 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
   val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
   val lastProb = new LinkedHashMap[A, Int]() //store the last second's probability
+  val trainStructure = new ArrayBuffer[ArrayBuffer[Any]]()
   var lastEntryAccessTime:Long = 0L
 
   private def addUsage(a: A) {
