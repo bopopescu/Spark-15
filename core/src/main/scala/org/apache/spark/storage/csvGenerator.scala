@@ -77,6 +77,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     out.flush()
     out_record.flush()
     
+    //write hitrate per second per block
+    val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt")))
+    //count how many seconds it runs
+    var secondsNum = 0
+
     breakable {
       while(true) {
         entries.synchronized {
@@ -108,6 +113,23 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
             }
           }
 
+          val iteratorH = entries.hitMiss.toIterator
+          while (iteratorH != null && iteratorH.hasNext) {
+            var strH = "" + secondsNum + "\t"
+            val (blockId, list) = iteratorH.next()
+            var countT = 0
+            for(i <- 0 until list.size) {
+              if(list(i) == true){
+                countT = countT + 1
+              }
+            }
+            val totalSize = list.size
+            val rate = 1.0 * countT / totalSize
+            strH = strH + blockId + "," + countT + "," + rate
+            outHitRate.write(strH)
+            outHitRate.flush()
+          }
+
           if(preLastTime == lastTime)
             count = count + 1
           else 
@@ -119,34 +141,35 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           preLastTime = lastTime          
         }
         Thread.sleep(1000)
+        secondsNum = secondsNum + 1
       }
     }
     out.close()
     out_record.close()
 
     //calculate the hit rate
-    println(s"######################################## Writing Hitrate ########################################")
-    entries.synchronized {
-      val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt", true)))
-      val iteratorH = entries.hitMiss.toIterator
-      var hitCount = 0
-      var totalSize = 0
-      while(iteratorH.hasNext) {
-        val (blockId, list) = iteratorH.next()
-        totalSize = totalSize + list.size
-        for(i <- 0 until list.size) {
-          if(list(i) == true){
-            hitCount = hitCount + 1
-          }
-        }
-      }
-      val hitRate = 1.0 * hitCount / totalSize
-      var hitRateRst = ""
+  //   println(s"######################################## Writing Hitrate ########################################")
+  //   entries.synchronized {
+  //     val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt", true)))
+  //     val iteratorH = entries.hitMiss.toIterator
+  //     var hitCount = 0
+  //     var totalSize = 0
+  //     while(iteratorH.hasNext) {
+  //       val (blockId, list) = iteratorH.next()
+  //       totalSize = totalSize + list.size
+  //       for(i <- 0 until list.size) {
+  //         if(list(i) == true){
+  //           hitCount = hitCount + 1
+  //         }
+  //       }
+  //     }
+  //     val hitRate = 1.0 * hitCount / totalSize
+  //     var hitRateRst = ""
       
-      hitRateRst = hitRateRst + index + "\t" + jobName + "\t" + hitRate + "\n"
-      outHitRate.write(hitRateRst)
-      println(s"######################################## Finish Writing Hitrate ########################################")
-      outHitRate.close()
-    }
-  }
+  //     hitRateRst = hitRateRst + index + "\t" + jobName + "\t" + hitRate + "\n"
+  //     outHitRate.write(hitRateRst)
+  //     println(s"######################################## Finish Writing Hitrate ########################################")
+  //     outHitRate.close()
+  //   }
+  // }
 }
