@@ -9,6 +9,7 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
 
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
   val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
+  val lastProb = new LinkedHashMap[A, Int]() //store the last second's probability
   var lastEntryAccessTime:Long = 0L
 
   private def addUsage(a: A) {
@@ -46,6 +47,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   extends MemoryStore(blockManager, maxMemory) {
 
   override val entries = new EnrichedLinkedHashMap[BlockId, MemoryEntry]
+  //TODO: design a data transportation structure for training.
 	
   val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
   logInfo(s"==============useBayes===========" + String.valueOf(useBayes))

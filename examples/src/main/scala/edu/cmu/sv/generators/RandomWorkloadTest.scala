@@ -22,7 +22,7 @@ object RandomWorkloadTest {
   def main(args: Array[String]) {
   	
     val iterations = if (args.length > 0) args(0).toInt else RANDOM_ITERATIONS
-    val conf = new SparkConf().setAppName("Random Workload").setUseBayes("true")
+    val conf = new SparkConf().setAppName("Random Workload").setUseBayes("false")
     implicit val spark = new SparkContext(conf)
 
     if (args.length > 1 && args(1) == "trace") {
