@@ -147,8 +147,6 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
 
           // preLastTime = lastTime      
           
-          
-          
         }
         Thread.sleep(1000)
       }
