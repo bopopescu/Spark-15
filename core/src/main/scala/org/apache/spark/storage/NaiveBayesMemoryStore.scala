@@ -4,13 +4,15 @@ import NaiveBayes._
 import scala.collection.mutable.{LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer
 import org.apache.spark.Logging
+import java.util.ArrayList
 
 private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap[A, B] with Logging {
 
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
   val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
   val lastProb = new LinkedHashMap[A, Int]() //store the last second's probability
-  val trainStructure = new ArrayBuffer[ArrayBuffer[Any]]()
+  val trainStructure = new ArrayList[ArrayList[Double]]()
+  val label = new ArrayList[Double]()
   var lastEntryAccessTime:Long = 0L
 
   private def addUsage(a: A) {
