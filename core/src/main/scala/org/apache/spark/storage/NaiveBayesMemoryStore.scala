@@ -139,6 +139,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
         }
       }
     }
+    
     resultSelectedMemory
   }
 
