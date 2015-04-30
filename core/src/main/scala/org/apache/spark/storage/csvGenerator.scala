@@ -1,6 +1,5 @@
 package org.apache.spark.storage
 
-import java.util.LinkedHashMap
 import java.util.LinkedList
 import java.io._
 import java.lang.System
@@ -8,6 +7,7 @@ import scala.math.random
 import org.apache.spark._
 import scala.util.Random
 import scala.util.control.Breaks._
+import scala.collection.mutable.{LinkedHashMap, ArrayBuffer}
 import java.nio.file.{Paths, Files}
 import java.io.PrintWriter
 import java.util.ArrayList
@@ -18,7 +18,7 @@ import java.util.ArrayList
  *    ./bin/spark-submit --class edu.cmu.sv.generators.InteractiveWorkloadTest --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar
  *    you can also use --master local[512]
  */
-class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:String) extends Thread {
+class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends Thread {
  
   final val K = 1.0 // contants for tunning
  
@@ -73,7 +73,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
             val freqIndi = usages.size                         //how many times this block been accessed, as f.
             val expectedHitRate = (freqIndi - 1) / freqIndi    //expected maxisum ratio of hitrate, f-1/f.
             
-            val hitList = entries.hitMiss.get(blockId)
+            val hitList = entries.hitMiss.get(blockId).get
             var countHit = 0
             for(i <- 0 until hitList.size) {
               if(hitList(i) == true){
@@ -102,15 +102,16 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
           while(iteratorM != null && iteratorM.hasNext) {
             val (blockId, usages) = iterator.next()
             val blockSize = entries.getNoUsage(blockId).size
+            val size = usages.size
             val ratio = 1.0 * usages(size-1) / currTime
-            val newProb = (lastProb.get(blockId) - minProb) / (maxProb - minProb)
-            val trainRecord = new ArrayList[Double]()
+            val newProb = (entries.lastProb.get(blockId).get - minProb) / (maxProb - minProb)
+            val trainRecord = new ArrayList[java.lang.Double]()
             trainRecord.add(usages.size)
             trainRecord.add(blockSize)
             trainRecord.add(ratio)
             entries.label.add(newProb)
             entries.trainStructure.add(trainRecord)
-            lastProb.put(blockId, newProb)
+            entries.lastProb.put(blockId, newProb)
           }
           val iteratorH = entries.hitMiss.toIterator
           while (iteratorH != null && iteratorH.hasNext) {
@@ -141,7 +142,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
     freqRatio : Double, hitMissRatio : Double, blockSize : Long) : Double = {
     val k = K
     val probChange = k * (freqRatio * blockSize) / hitMissRatio
-    val newProb = lastProb.get(blockId) + probChange
+    val newProb = lastProb.get(blockId).get + probChange
     lastProb.put(blockId, newProb)
     newProb
   }

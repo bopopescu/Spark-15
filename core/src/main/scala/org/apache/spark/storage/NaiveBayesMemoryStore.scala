@@ -10,9 +10,9 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
 
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
   val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
-  val lastProb = new LinkedHashMap[A, Int]() //store the last second's probability
-  val trainStructure = new ArrayList[ArrayList[Double]]()
-  val label = new ArrayList[Double]()
+  val lastProb = new LinkedHashMap[A, Double]() //store the last second's probability
+  val trainStructure = new ArrayList[ArrayList[java.lang.Double]]()
+  val label = new ArrayList[java.lang.Double]()
   var lastEntryAccessTime:Long = 0L
 
   private def addUsage(a: A) {
@@ -50,32 +50,22 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   extends MemoryStore(blockManager, maxMemory) {
 
   override val entries = new EnrichedLinkedHashMap[BlockId, MemoryEntry]
-  //TODO: design a data transportation structure for training.
+  var predictionCount = 0
 	
   val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
   logInfo(s"==============useBayes===========" + String.valueOf(useBayes))
   var dataset : DataSet = null
   var eva : Evaluation = null
-  
-  val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","Iterative Workload"))
-  var selectedInputFile = "segment1.data"
-  
-  if(jobName == "Iterative Workload")
-    selectedInputFile = "segment1.data"
-  else if (jobName =="Interactive Workload")
-    selectedInputFile = "segment2.data"
-  else if(jobName == "Random Workload")
-    selectedInputFile = "segment3.data"
 
   //create the bayes classifier.
   if(useBayes) {
-    dataset = new DataSet(selectedInputFile)
+    dataset = new DataSet("segment.data")
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
   }
   
   
-  private val trainingDataGenerator = new CsvGenerator(entries, jobName)
+  private val trainingDataGenerator = new CsvGenerator(entries)
   trainingDataGenerator.start
 
   protected def findBlocksToReplace (
@@ -103,6 +93,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     logInfo(s"====================naiveBayesFindBlocksToReplace==========")
     
     var resultSelectedMemory = selectedMemory
+    predictionCount = predictionCount + 1
     synchronized {
       entries.synchronized {
         while (actualFreeMemory + resultSelectedMemory < space && entries.usage.toIterator.hasNext) {
@@ -138,6 +129,10 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
           }
         }
       }
+    }
+    if(predictionCount == 5000) {
+      dataset.dataReset(entries.trainStructure, entries.label)
+      predictionCount = 0;
     }
     resultSelectedMemory
   }
