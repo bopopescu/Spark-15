@@ -167,11 +167,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
               else{
                 strH = strH + blockId + ",0"
               }
-              outHitRate.write(strH)
-              outHitRate.flush()
             }
+            outHitRate.write(strH)
+            outHitRate.flush()
           }
-
+          entries.hitMiss.clear()
           // if(preLastTime == lastTime)
           //   count = count + 1
           // else 
