@@ -97,11 +97,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
             val freqIndi = usages.size                         //how many times this block been accessed, as f.
             val expectedHitRate = (freqIndi - 1) / freqIndi    //expected maxisum ratio of hitrate, f-1/f.
             
-            val hitList = entries.hitMiss.get(blockId)
+            val hitList = entries.hitMiss.get(blockId).get
             var countHit = 0
             for(i <- 0 until hitList.size) {
-              if(list(i) == true){
-                countHit = countT + 1
+              if(hitList(i) == true){
+                countHit = countHit + 1
               }
             }
             val realHitRate = 1.0 * countHit / hitList.size
@@ -189,8 +189,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry], jobName:
         secondsNum = secondsNum + 1
       }
     }
-    out.close()
-    out_record.close()
+    outHitRate.close()
+    // out.close()
+    // out_record.close()
 
     //calculate the hit rate
   //   println(s"######################################## Writing Hitrate ########################################")
