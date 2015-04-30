@@ -132,10 +132,10 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             
             for(i <- 0 until list.size) {
               if(list(i) == true){
-                strH = strH + blockId + ",1"
+                strH = strH + blockId + ",1\n"
               }
               else{
-                strH = strH + blockId + ",0"
+                strH = strH + blockId + ",0\n"
               }
             }
             outHitRate.write(strH)
