@@ -110,7 +110,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
           
           val iteratorM = entries.usage.toIterator
           while(iteratorM != null && iteratorM.hasNext) {
-            val (blockId, usages) = iterator.next()
+            val (blockId, usages) = iteratorM.next()
             val blockSize = entries.getNoUsage(blockId).size
             val size = usages.size
             val ratio = 1.0 * usages(size-1) / currTime
@@ -155,8 +155,14 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     freqRatio : Double, hitMissRatio : Double, blockSize : Long) : Double = {
     val k = K
     val probChange = k * (freqRatio * blockSize) / hitMissRatio
-    val newProb = lastProb.get(blockId).get + probChange
-    lastProb.put(blockId, newProb)
+    var newProb = 0.0
+    if(lastProb.get(blockId) != None) {
+      newProb = lastProb.get(blockId).get + probChange
+      lastProb.put(blockId, newProb)
+    } else {
+      newProb = probChange
+      lastProb.put(blockId, newProb)
+    }
     newProb
   }
 }
