@@ -81,19 +81,21 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val (blockId, usages) = iterator.next()
             val freqIndi = usages.size                         //how many times this block been accessed, as f.
             val expectedHitRate = (freqIndi - 1) / freqIndi    //expected maxisum ratio of hitrate, f-1/f.
-            
-            val hitList = entries.hitMiss.get(blockId).get
+
+            val hitList = entries.hitMiss.getOrElse(blockId, new ArrayBuffer[Boolean]())
             var countHit = 0
             for(i <- 0 until hitList.size) {
               if(hitList(i) == true){
                 countHit = countHit + 1
               }
             }
-            
-            val realHitRate = 1.0 * countHit / hitList.size
+
+            val hitListSize = if(hitList.size != 0) hitList.size else 1
+            val realHitRate = 1.0 * countHit / hitListSize
             val hitMissRatio = realHitRate / expectedHitRate 
             val freqRatio = freqIndi / sumFreq                //ratio that shows this block's intense.
-            val blockSize = entries.getNoUsage(blockId).size
+            val noUsage = if(entries.getNoUsage(blockId))!=null entries.getNoUsage(blockId).size else 0
+            val blockSize = noUsage
             val size = usages.size
             val ratio = 1.0 * usages(size-1) / currTime
             val newProb = calculateNewProbability(entries.lastProb, blockId, freqRatio, hitMissRatio, blockSize)
