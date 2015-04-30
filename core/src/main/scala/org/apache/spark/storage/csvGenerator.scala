@@ -47,8 +47,10 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     }
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
 
-    //write hitrate per second per block
+    //write hit/misses per second per block
     val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt")))
+    //write hitrate per second per block
+    val blockHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("BlockHitRate.txt")))
     //count how many seconds it runs
     var secondsNum = 0
 
@@ -98,6 +100,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val ratio = 1.0 * usages(size-1) / currTime
             val newProb = calculateNewProbability(entries.lastProb, blockId, freqRatio, hitMissRatio, blockSize)
 
+            blockHitRate.write(blockId + "," + realHitRate)
+            blockHitRate.flush()
+            
             if(maxProb < newProb) {
               maxProb = newProb
             }
