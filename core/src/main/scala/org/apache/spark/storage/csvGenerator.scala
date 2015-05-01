@@ -79,6 +79,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
           val iterator = entries.usage.toIterator
           var maxProb = 0.0
           var minProb = -1.0
+
+          blockHitRate.write("time "secondsNum + " seconds\n")
+          blockHitRate.flush()
           while(iterator != null && iterator.hasNext) {
             val (blockId, usages) = iterator.next()
             val freqIndi = usages.size                         //how many times this block been accessed, as f.
@@ -102,7 +105,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val ratio = 1.0 * usages(size-1) / currTime
             val newProb = calculateNewProbability(entries.lastProb, blockId, freqRatio, hitMissRatio, blockSize)
 
-            blockHitRate.write(blockId + "," + realHitRate)
+            blockHitRate.write(blockId + "," + realHitRate + "\n")
             blockHitRate.flush()
             
             if(maxProb < newProb) {
@@ -150,6 +153,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             outHitRate.flush()
           }
           entries.hitMiss.clear()
+
+          blockHitRate.write("\n\n")
+          blockHitRate.flush()
         }
         Thread.sleep(1000)
         secondsNum = secondsNum + 1
