@@ -80,7 +80,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
           var maxProb = 0.0
           var minProb = -1.0
 
-          blockHitRate.write("time "secondsNum + " seconds\n")
+          blockHitRate.write("time " + secondsNum + " seconds\n")
           blockHitRate.flush()
           while(iterator != null && iterator.hasNext) {
             val (blockId, usages) = iterator.next()
