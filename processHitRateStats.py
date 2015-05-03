@@ -26,7 +26,9 @@ if __name__ == "__main__":
 
 	print "Processing HitRate.txt ..."
 
-	jobName = blocksHitRate.readline()
+	firstline = blocksHitRate.readline().split(",")
+	jobName = firstline[0]
+	jobType = firstline[1].split("\n")[0]
 
 	# (k,v) = (block_id, (hits, total))
 	blockIdHitMissMap = {}
@@ -55,7 +57,7 @@ if __name__ == "__main__":
 	 		blockIdHitMissMap["total"] = (hits, total+1)
 
 	# write job name + overall hit rate
-	hitRateCalculations.write(jobName.split("\n")[0] + " {}\n\n".format(
+	hitRateCalculations.write(jobName + " " + jobType + " {}\n\n".format(
 							  1.0 * blockIdHitMissMap["total"][0]/blockIdHitMissMap["total"][1]))
 
 	# write the blocks + calculate hit rate
