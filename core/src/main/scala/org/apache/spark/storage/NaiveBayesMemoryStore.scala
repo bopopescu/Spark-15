@@ -53,7 +53,6 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   var predictionCount = 0
 	
   val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
-  logInfo(s"==============useBayes===========" + String.valueOf(useBayes))
   var dataset : DataSet = null
   var eva : Evaluation = null
 
@@ -63,7 +62,6 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
   }
-  
   
   private val trainingDataGenerator = new CsvGenerator(entries)
   trainingDataGenerator.start
@@ -76,10 +74,11 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
 
-    if(useBayes)
+    if(useBayes) {
       naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-    else
+    } else {
       findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+    }
   }
 
   private def naiveBayesFindBlocksToReplace(
