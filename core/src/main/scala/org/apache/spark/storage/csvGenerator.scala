@@ -47,6 +47,8 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     }
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
 
+    val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","default name"))
+    val useBayes = java.lang.Boolean.valueOf(System.getProperty("CMU_USEBAYES_FLAG","false"))
     //write hit/misses per second per block
     val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt")))
     //write hitrate per second per block
@@ -57,6 +59,13 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     
+    var algType = "LRU"
+    if (useBayes)
+      algType = "NaiveBayes"
+
+    outHitRate.write(jobName + "," + algType + "\n")
+    outHitRate.flush()
+
     // out.write("1,1,1,1\n")
     // out_record.write("1,1,1,1\n")
     // out.flush()
@@ -79,6 +88,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
           val iterator = entries.usage.toIterator
           var maxProb = 0.0
           var minProb = -1.0
+
+          blockHitRate.write("time " + secondsNum + " seconds\n")
+          blockHitRate.flush()
           while(iterator != null && iterator.hasNext) {
             val (blockId, usages) = iterator.next()
             val freqIndi = usages.size                         //how many times this block been accessed, as f.
@@ -102,7 +114,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val ratio = 1.0 * usages(size-1) / currTime
             val newProb = calculateNewProbability(entries.lastProb, blockId, freqRatio, hitMissRatio, blockSize)
 
-            blockHitRate.write(blockId + "," + realHitRate)
+            blockHitRate.write(blockId + "," + realHitRate + "\n")
             blockHitRate.flush()
             
             if(maxProb < newProb) {
@@ -150,6 +162,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             outHitRate.flush()
           }
           entries.hitMiss.clear()
+
+          blockHitRate.write("\n\n")
+          blockHitRate.flush()
         }
         Thread.sleep(1000)
         secondsNum = secondsNum + 1
