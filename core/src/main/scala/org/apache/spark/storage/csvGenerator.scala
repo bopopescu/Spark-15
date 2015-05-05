@@ -161,7 +161,6 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             entries.trainStructure.add(trainRecord)
             entries.predictProb.put(blockId, newProb)
             entries.lastProb.put(blockId, newProb)
-            System.out.println("predictProb, blockId: " + String.valueOf(blockId) + ", Prob: " + String.valueOf(newProb))
           }
 
           val iteratorH = entries.hitMiss.toIterator
