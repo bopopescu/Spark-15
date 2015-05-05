@@ -104,7 +104,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
           tempMap.put(usageBlockId, predict)
           logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
               + s" frequency:" + String.valueOf(blockUsage.size)
-              + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+              + s" block size:" + String.valueOf(entries.getNoUsage(usageBlockId).size)
               + s" predict:" + String.valueOf(predict))
         }
         val tempList = tempMap.toList.sortBy{_._2}
