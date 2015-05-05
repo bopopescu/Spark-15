@@ -157,11 +157,11 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val (blockId, list) = iteratorH.next()
             
             for(i <- 0 until list.size) {
-              if(list(i) == true){
-                strH = strH + blockId + ",1\n"
+              if(list(i)._1 == true){
+                strH = strH + blockId + ",1," + list(i)._2 + "\n"
               }
               else{
-                strH = strH + blockId + ",0\n"
+                strH = strH + blockId + ",0," + list(i)._2 + "\n"
               }
             }
             outHitRate.write(strH)
