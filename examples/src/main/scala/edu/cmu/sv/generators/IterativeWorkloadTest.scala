@@ -20,7 +20,7 @@ object IterativeWorkloadTest {
 
     val conf = new SparkConf()
       .setAppName("Iterative Workload")
-      .setUseBayes("true")      
+      .setUseBayes("2")      
 
     implicit val spark = new SparkContext(conf)
 

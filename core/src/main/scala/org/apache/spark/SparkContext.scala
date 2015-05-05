@@ -214,7 +214,7 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   }
 
   if (conf.contains("cmu.useBayes")){
-    System.setProperty("CMU_USEBAYES_FLAG", "true")
+    System.setProperty("CMU_USEBAYES_FLAG", conf.get("cmu.useBayes"))
   }
 
   if (conf.contains("spark.app.name")) {
