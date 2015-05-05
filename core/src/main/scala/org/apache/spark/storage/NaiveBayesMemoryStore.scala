@@ -1,9 +1,10 @@
 package org.apache.spark.storage
 
 import NaiveBayes._
-import scala.collection.mutable.{LinkedHashMap, ArrayBuffer}
+import scala.collection.mutable.{Map, LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer
 import org.apache.spark.Logging
+import scala.util.control.Breaks._
 import java.util.ArrayList
 
 private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap[A, B] with Logging {
@@ -93,44 +94,80 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     
     var resultSelectedMemory = selectedMemory
     predictionCount = predictionCount + 1
+    val tempMap = new LinkedHashMap[BlockId, Double]
     synchronized {
       entries.synchronized {
-        while (actualFreeMemory + resultSelectedMemory < space && entries.usage.toIterator.hasNext) {
-          var usageIterator = entries.usage.toIterator
-          if(usageIterator.hasNext) {
-            var (usageBlockId, blockUsage) = usageIterator.next()        
-            val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
-            var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size, lastAccess))
-            logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+        val iterator = entries.usage.toIterator
+        while(iterator.hasNext) {
+          val (usageBlockId, blockUsage) = iterator.next()
+          val predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
+          tempMap.put(usageBlockId, predict)
+          logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
               + s" frequency:" + String.valueOf(blockUsage.size)
               + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-              + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
               + s" predict:" + String.valueOf(predict))
-
-            while(usageIterator.hasNext) {
-              var (usageTempBlockId, blockUsage) = usageIterator.next()
-              var tempPredict = eva.predict(Array(blockUsage.size, entries.get(usageBlockId).size, lastAccess))
-              logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
-              + s" frequency:" + String.valueOf(blockUsage.size)
-              + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
-              + s" last access rate:" + String.valueOf((blockUsage.last * 1.0) / (System.currentTimeMillis() * 1.0)) 
-              + s" predict:" + String.valueOf(predict))
-              if(predict > tempPredict) {
-                predict = tempPredict
-                usageBlockId = usageTempBlockId
-              }
+        }
+        val tempList = tempMap.toList.sortBy{_._2}
+        breakable {
+          for(i <- tempList) {
+            val tempBlockId = i._1
+            selectedBlocks += tempBlockId
+            resultSelectedMemory += entries.getNoUsage(tempBlockId).size
+            logInfo(s"Choose to drop Block: " + String.valueOf(tempBlockId)
+              + s" resultSelectedMemory: " + String.valueOf(resultSelectedMemory)
+              + s" freeMemory: " + String.valueOf(actualFreeMemory + resultSelectedMemory)
+              + s" space: " + String.valueOf(space))
+            if(actualFreeMemory + resultSelectedMemory >= space) {
+              break
             }
-            selectedBlocks += usageBlockId
-            resultSelectedMemory += entries.getNoUsage(usageBlockId).size
-            logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
-              + s" timeLine: " + String.valueOf(blockUsage.last)
-              + s" access frequency: " + String.valueOf(blockUsage.size));
           }
         }
       }
     }
-    if(predictionCount == 5000) {
+    
+    //   entries.synchronized {
+    //     while (actualFreeMemory + resultSelectedMemory < space && entries.usage.toIterator.hasNext) {
+    //       var usageIterator = entries.usage.toIterator
+    //       if(usageIterator.hasNext) {
+    //         val (usageBlockId, blockUsage) = usageIterator.next()
+    //         var finalResult = usageBlockId
+    //         val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
+    //         var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
+    //         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+    //           + s" frequency:" + String.valueOf(blockUsage.size)
+    //           + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+    //           + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
+    //           + s" predict:" + String.valueOf(predict))
+
+    //         while(usageIterator.hasNext) {
+    //           val (usageTempBlockId, tempblockUsage) = usageIterator.next()
+    //           val templastAccess = tempblockUsage.last * 1.0 / System.currentTimeMillis()
+    //           val tempPredict = eva.predict(Array(tempblockUsage.size, entries.get(usageTempBlockId).size))
+    //           logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
+    //           + s" frequency:" + String.valueOf(tempblockUsage.size)
+    //           + s" block size:" + String.valueOf(entries.get(usageTempBlockId).size)
+    //           + s" last access rate:" + String.valueOf(templastAccess) 
+    //           + s" predict:" + String.valueOf(tempPredict))
+    //           if(predict > tempPredict) {
+    //             predict = tempPredict
+    //             finalResult = usageTempBlockId
+    //           }
+    //         }
+    //         selectedBlocks += usageBlockId
+    //         resultSelectedMemory += entries.getNoUsage(usageBlockId).size
+    //         logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+    //           + s" timeLine: " + String.valueOf(blockUsage.last)
+    //           + s" resultSelectedMemory: " + String.valueOf(resultSelectedMemory)
+    //           + s" freeMemory: " + String.valueOf(actualFreeMemory + resultSelectedMemory)
+    //           + s" space: " + String.valueOf(space)
+    //           + s" access frequency: " + String.valueOf(blockUsage.size));
+    //       }
+    //     }
+    //   }
+    if(predictionCount == 10) {
+      logInfo(s"retraining!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       dataset.dataReset(entries.trainStructure, entries.label)
+      eva.retrain();
       predictionCount = 0;
     }
     resultSelectedMemory
@@ -166,8 +203,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
       space: Long): ResultWithDroppedBlocks = {
 
     val droppedBlocks = new ArrayBuffer[(BlockId, BlockStatus)]
-    logInfo(s"ensureFreeSpace new!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-
+    
     if (space > maxMemory) {
       logInfo(s"Will not store $blockIdToAdd as it is larger than our memory limit")
       return ResultWithDroppedBlocks(success = false, droppedBlocks)
@@ -175,6 +211,10 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
 
     // Take into account the amount of memory currently occupied by unrolling blocks
     val actualFreeMemory = freeMemory - currentUnrollMemory
+    
+    logInfo(s"!!!!!!!!!!!!!!!!!!ensureFreeSpace new: actualFreeMemory: "
+     + String.valueOf(actualFreeMemory) + s", space: " + String.valueOf(space))
+
 
     if (actualFreeMemory < space) {
       val rddToAdd = getRddId(blockIdToAdd)

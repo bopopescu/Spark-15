@@ -134,11 +134,10 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val blockSize = noUsage
             val size = usages.size
             val ratio = 1.0 * usages(size-1) / currTime
-            val newProb = (entries.lastProb.get(blockId).get - minProb) / (maxProb - minProb)
+            val newProb = Math.round((entries.lastProb.get(blockId).get - minProb) / (maxProb - minProb))
             val trainRecord = new ArrayList[java.lang.Double]()
             trainRecord.add(usages.size)
             trainRecord.add(blockSize)
-            trainRecord.add(ratio)
             entries.label.add(newProb)
             entries.trainStructure.add(trainRecord)
             entries.lastProb.put(blockId, newProb)
