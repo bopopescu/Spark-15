@@ -10,7 +10,7 @@ import java.util.ArrayList
 private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap[A, B] with Logging {
 
 	val usage = new LinkedHashMap[A, ArrayBuffer[Long]]()
-  val hitMiss = new LinkedHashMap[A, ArrayBuffer[Boolean]]() //hit is true
+  val hitMiss = new LinkedHashMap[A, ArrayBuffer[(Boolean, Long)]]() //hit is true
   val lastProb = new LinkedHashMap[A, Double]() //store the last second's probability
   val trainStructure = new ArrayList[ArrayList[java.lang.Double]]()
   val label = new ArrayList[java.lang.Double]()
@@ -30,8 +30,10 @@ private[spark] class EnrichedLinkedHashMap[A, B] extends java.util.LinkedHashMap
   }
 
   private def addHitMiss(a: A, hit:Boolean) {
-    val hitMisses = hitMiss.getOrElseUpdate(a, ArrayBuffer[Boolean]())
-    hitMisses += hit
+    lastEntryAccessTime = System.currentTimeMillis
+    val hitMisses = hitMiss.getOrElseUpdate(a, ArrayBuffer[(Boolean, Long)]())
+    val tuple = (hit, lastEntryAccessTime)
+    hitMisses += tuple
   }
 
   def getNoUsage(a: A): B = super.get(a)
