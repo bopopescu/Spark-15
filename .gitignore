@@ -1,3 +1,7 @@
+*.data
+*.csv
+HitRate
+HitRate.txt
 *~
 *.#*
 *#*#
@@ -6,6 +10,7 @@
 *.iml
 *.iws
 *.pyc
+*.pyo
 .idea/
 .idea_modules/
 build/*.jar

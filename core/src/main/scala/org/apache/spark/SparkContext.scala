@@ -213,6 +213,14 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     logInfo("Spark configuration:\n" + conf.toDebugString)
   }
 
+  if (conf.contains("cmu.algorithm")){
+    System.setProperty("CMU_ALGORITHM_ENUM", conf.get("cmu.algorithm"))
+  }
+
+  if (conf.contains("spark.app.name")) {
+    System.setProperty("CMU_APP_NAME", conf.get("spark.app.name"))
+  }
+
   // Set Spark driver host and port system properties
   conf.setIfMissing("spark.driver.host", Utils.localHostName())
   conf.setIfMissing("spark.driver.port", "0")
