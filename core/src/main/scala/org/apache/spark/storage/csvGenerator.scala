@@ -1,5 +1,6 @@
 package org.apache.spark.storage
 
+// scalastyle:off
 import java.util.LinkedList
 import java.io._
 import java.lang.System
@@ -219,3 +220,4 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     newProb
   }
 }
+// scalastyle:on

@@ -1,5 +1,7 @@
 package org.apache.spark.storage
 
+// scalastyle:off
+
 import NaiveBayes._
 import scala.collection.mutable.{Map, LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer
@@ -331,3 +333,5 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     }
   }
 }
+
+// scalastyle:on
