@@ -48,7 +48,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
 
     val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","default name"))
-    val useBayes = java.lang.Integer.valueOf(System.getProperty("CMU_USEBAYES_FLAG","0"))
+    val algorithm = java.lang.Integer.valueOf(System.getProperty("CMU_ALGORITHM_ENUM","0"))
     //write hit/misses per second per block
     val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt")))
     //write hitrate per second per block
@@ -60,9 +60,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
     
     var algType = "LRU"
-    if (useBayes == 1)
+    if (algorithm == 1)
       algType = "NaiveBayes"
-    else if (useBayes == 2)
+    else if (algorithm == 2)
       algType = "Reinforcement Learning"
 
     outHitRate.write(jobName + "," + algType + "\n")

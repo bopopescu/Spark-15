@@ -66,12 +66,12 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   override val entries = new EnrichedLinkedHashMap[BlockId, MemoryEntry]
   var predictionCount = 0
 	
-  val useBayes = java.lang.Integer.valueOf(System.getProperty("CMU_USEBAYES_FLAG","0"))
+  val algorithm = java.lang.Integer.valueOf(System.getProperty("CMU_ALGORITHM_ENUM","0"))
   var dataset : DataSet = null
   var eva : Evaluation = null
 
   //create the bayes classifier.
-  if(useBayes == 1) {
+  if(algorithm == 1) {
     dataset = new DataSet("segment.data")
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
@@ -88,9 +88,9 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     selectedBlocks: ArrayBuffer[BlockId],
     selectedMemory: Long) : Long = {
 
-    if(useBayes == 1) {
+    if(algorithm == 1) {
       naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-    } else if (useBayes == 2){
+    } else if (algorithm == 2){
       rlFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     } else {
       findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)

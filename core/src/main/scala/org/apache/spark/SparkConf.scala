@@ -144,8 +144,13 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging {
     this
   }
 
-  def setUseBayes(master: String): SparkConf = {
-    set("cmu.useBayes", master)
+  /**
+   * 0 = LRU
+   * 1 = naive bayes
+   * 2 = Reinforcement Learning
+   */
+  def setAlgorithm(master: String): SparkConf = {
+    set("cmu.algorithm", master)
   }
 
   /**
