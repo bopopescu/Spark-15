@@ -53,6 +53,8 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt")))
     //write hitrate per second per block
     val blockHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("BlockHitRate.txt")))
+    //write hitrate per second for d3 graph
+    val hitRatePerTimeUnit = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("hitRatePerTimeUnit.csv")))
     //count how many seconds it runs
     var secondsNum = 0
 
@@ -67,6 +69,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
 
     outHitRate.write(jobName + "," + algType + "\n")
     outHitRate.flush()
+
+    hitRatePerTimeUnit.write("timeunit,hitrate\n")
+    hitRatePerTimeUnit.flush()
 
     // out.write("1,1,1,1\n")
     // out_record.write("1,1,1,1\n")
@@ -126,6 +131,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             hitsPerSec = hitsPerSec + countHit
             totalPerSec = totalPerSec + hitListSize
             blockHitRate.write(blockId + "," + realHitRate + "\n")
+            blockHitRate.flush()
             
             if(maxProb < newProb) {
               maxProb = newProb
@@ -138,8 +144,8 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
           }
 
           val hitRatePerSec = if (totalPerSec == 0) 0.0 else 1.0 * hitsPerSec / totalPerSec
-          blockHitRate.write("hitRatePerSecond," + hitRatePerSec + "\n")
-          blockHitRate.flush()
+          hitRatePerTimeUnit.write(secondsNum + "," + hitRatePerSec + "\n")
+          hitRatePerTimeUnit.flush()
           
           val iteratorM = entries.usage.toIterator
           while(iteratorM != null && iteratorM.hasNext) {
