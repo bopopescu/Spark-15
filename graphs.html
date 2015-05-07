@@ -65,7 +65,12 @@ d3.csv("hitRatePerTimeUnit.csv", function(error, data) {
   x.domain(d3.extent(data, function(d) { return d.timeunit; }));
   y.domain(d3.extent(data, function(d) { return d.hitrate; }));
 
-  // todo: add chart name 
+  svg.append("text")
+      .attr("x", (width / 2))             
+      .attr("y", 0 - (margin.top/14))
+      .attr("text-anchor", "middle")  
+      .style("font-size", "24px") 
+      .text("Hit Rate Per Second");
 
   svg.append("g")
       .attr("class", "x axis")
@@ -73,7 +78,7 @@ d3.csv("hitRatePerTimeUnit.csv", function(error, data) {
       .call(xAxis)
     .append("text")
       .attr("transform", "translate(" + width/2 + ",30)")
-      .text("Time (seconds)");
+      .text("Time (Seconds)");
 
   // todo: fix x axis units
 
@@ -85,6 +90,7 @@ d3.csv("hitRatePerTimeUnit.csv", function(error, data) {
       .attr("dy", ".71em")
       .attr("transform", "translate(-15," + height/2 + ")")
       .style("text-anchor", "end")
+      .style("font-size", "12px") 
       .text("Hit Rate");
 
    svg.append("path")
