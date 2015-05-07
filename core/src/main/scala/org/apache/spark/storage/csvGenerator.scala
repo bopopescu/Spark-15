@@ -47,11 +47,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
       }
     }
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
-
-    val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","default name"))
-    val algorithm = java.lang.Integer.valueOf(System.getProperty("CMU_ALGORITHM_ENUM","0"))
+    
     //write hit/misses per second per block
-    val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt")))
+    val outHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("HitRate.txt",true)))
     //write hitrate per second per block
     val blockHitRate = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("BlockHitRate.txt")))
     //write hitrate per second for d3 graph
@@ -61,14 +59,9 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
 
 
     println(s"CMU - Usage information written to csv file, time: " + String.valueOf(System.currentTimeMillis()))
-    
-    var algType = "LRU"
-    if (algorithm == 1)
-      algType = "NaiveBayes"
-    else if (algorithm == 2)
-      algType = "Reinforcement Learning"
+      
 
-    outHitRate.write(jobName + "," + algType + "\n")
+    // outHitRate.write(s"jobName,algType,blockId,hit,timestamp")
     outHitRate.flush()
 
     hitRatePerTimeUnit.write("timeunit,hitrate\n")
@@ -81,6 +74,16 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
 
     breakable {
       while(true) {
+
+        val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","default name"))
+        val algorithm = java.lang.Integer.valueOf(System.getProperty("CMU_ALGORITHM_ENUM","0"))
+
+        var algType = "LRU"
+        if (algorithm == 1)
+          algType = "NaiveBayes"
+        else if (algorithm == 2)
+          algType = "Reinforcement Learning"
+
         entries.synchronized {
           val currTime = System.currentTimeMillis()
           var lastTime = entries.lastEntryAccessTime
@@ -178,10 +181,10 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             
             for(i <- 0 until list.size) {
               if(list(i)._1 == true){
-                strH = strH + blockId + ",1," + list(i)._2 + "\n"
+                strH = strH + jobName + "," + algType + "," + blockId + ",1," + list(i)._2 + "\n"
               }
               else{
-                strH = strH + blockId + ",0," + list(i)._2 + "\n"
+                strH = strH + jobName + "," + algType + "," +  blockId + ",0," + list(i)._2 + "\n"
               }
             }
             outHitRate.write(strH)

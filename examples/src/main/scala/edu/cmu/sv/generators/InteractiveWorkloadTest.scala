@@ -7,6 +7,7 @@ import scala.util.Random
 /* 
  * generates an interactive workload
  * execute with: 
+ * ./bin/spark-submit --class edu.cmu.sv.generators.InteractiveWorkloadTest --executor-memory 512g --driver-memory 1g --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 10 trace 4 0
  * ./bin/spark-submit --class edu.cmu.sv.generators.InteractiveWorkloadTest --master local-cluster[2,1,512] ./examples/target/scala-2.10/spark-examples-1.3.0-SNAPSHOT-hadoop1.0.4.jar 10 trace 1 /tmp/part-00000-of-00500.csv
  */
 object InteractiveWorkloadTest {
@@ -19,7 +20,8 @@ object InteractiveWorkloadTest {
   def main(args: Array[String]) {
   	
     val iterations = if (args.length > 0) args(0).toInt else ITERATIONS
-    val conf = new SparkConf().setAppName("Interactive Workload").setAlgorithm("0")
+    val conf = new SparkConf().setAppName("Interactive Workload")
+      .setAlgorithm(""+ (if (args.length > 3) args(3).toInt else 0))
     implicit val spark = new SparkContext(conf)
 
     if (args.length > 1 && args(1) == "trace") {
@@ -35,8 +37,6 @@ object InteractiveWorkloadTest {
       val pi = new PiInteractiveWorkload
       pi.concurrentWorkload()
     }
-
-    Thread.sleep(20000)
     
     spark.stop()
   }
