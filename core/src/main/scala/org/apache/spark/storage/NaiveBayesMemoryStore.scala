@@ -211,8 +211,8 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
             val tempBlockId = i._1
             selectedBlocks += tempBlockId
             resultSelectedMemory += entries.getNoUsage(tempBlockId).size
-            //logInfo(s"Choose to drop Block: " + String.valueOf(tempBlockId)
-            //  + s", probability: " + String.valueOf(i._2))
+            logInfo(s"Choose to drop Block: " + String.valueOf(tempBlockId)
+              + s", probability: " + String.valueOf(i._2))
               if(actualFreeMemory + resultSelectedMemory >= space) {
               break
             }
