@@ -22,17 +22,16 @@ object RandomWorkloadTest {
   def main(args: Array[String]) {
   	
     val iterations = if (args.length > 0) args(0).toInt else RANDOM_ITERATIONS
-    val conf = new SparkConf().setAppName("Random Workload").setUseBayes("2")
+    val conf = new SparkConf().setAppName("Random Workload")
+      .setAlgorithm(""+ (if (args.length > 3) args(3).toInt else 0))
     implicit val spark = new SparkContext(conf)
 
     if (args.length > 1 && args(1) == "trace") {
       class TraceInteractiveWorkload extends InteractiveWorkload(CONCURRENT_ITERATIONS, CONCURRENT_WORKLOADS, CONCURRENT_MIN_WAIT_TIME, CONCURRENT_MAX_WAIT_TIME) with GoogleTraceTaskUsage {
         override val nreads = args(2).toInt
-        // override val filepath = args(3)
       }
       class TraceIterativeWorkload extends IterativeWorkload(ITERATIVE_ITERATIONS, ITERATIVE_SLEEP_MILLIS) with GoogleTraceTaskUsage {
-        override val nreads = args(2).toInt
-        override val filepath = args(3)
+        override val nreads = args(2).toInt        
       }
       class TraceRandomWorkload extends RandomWorkload(iterations, new TraceInteractiveWorkload(), new TraceIterativeWorkload())
       val trace = new TraceRandomWorkload
@@ -45,8 +44,6 @@ object RandomWorkloadTest {
       val pi = new PiRandomWorkload
       pi.randomWorkload()
     }
-
-    Thread.sleep(20000)
     
     spark.stop()
   }

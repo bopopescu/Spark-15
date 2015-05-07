@@ -1,0 +1,31 @@
+<html>
+  
+  <head>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://dimplejs.org/dist/dimple.v2.1.2.min.js"></script>
+  </head>
+
+  <!-- remember to add header: jobName,algType,blockId,hit,timestamp -->
+  <body>
+
+    <div id="chartContainer">      
+      <script type="text/javascript">
+        var svg = dimple.newSvg("#chartContainer", 590, 400);
+        d3.csv("vizualize.csv", function (data) {
+          data = dimple.filterData(data, "jobName", ["Random Workload"])
+          var myChart = new dimple.chart(svg, data);
+          myChart.setBounds(60, 30, 505, 305);
+          var x = myChart.addCategoryAxis("x", "startNorm");
+          x.addOrderRule("startNorm");
+          myChart.addMeasureAxis("y", "hitRate");
+          var s = myChart.addSeries("algType", dimple.plot.line);
+          s.interpolation = "cardinal";
+          myChart.addLegend(60, 10, 500, 20, "right");
+          myChart.draw();
+        });
+      </script>
+    </div>
+
+  </body>
+
+</html>

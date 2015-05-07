@@ -263,6 +263,13 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
+      
+    <!-- <repository>
+        <id>project.local</id>
+        <name>project</name>
+        <url>file:${project.basedir}/core/repo</url>
+    </repository> -->
+
   </repositories>
   <pluginRepositories>
     <pluginRepository>
@@ -1439,7 +1446,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
       </plugin>
-      <plugin>
+      <!-- <plugin>
         <groupId>org.scalastyle</groupId>
         <artifactId>scalastyle-maven-plugin</artifactId>
         <version>0.4.0</version>
@@ -1462,7 +1469,7 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
+      </plugin> -->
       <!-- Enable surefire and scalatest in all children, in one place: -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
