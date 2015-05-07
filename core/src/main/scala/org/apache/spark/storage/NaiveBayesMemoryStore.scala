@@ -119,7 +119,7 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
           tempMap.put(usageBlockId, predict)
           logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
               + s" frequency:" + String.valueOf(blockUsage.size)
-              + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+              + s" block size:" + String.valueOf(entries.getNoUsage(usageBlockId).size)
               + s" predict:" + String.valueOf(predict))
         }
         val tempList = tempMap.toList.sortBy{_._2}
@@ -209,8 +209,8 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
             val tempBlockId = i._1
             selectedBlocks += tempBlockId
             resultSelectedMemory += entries.getNoUsage(tempBlockId).size
-            //logInfo(s"Choose to drop Block: " + String.valueOf(tempBlockId)
-            //  + s", probability: " + String.valueOf(i._2))
+            logInfo(s"Choose to drop Block: " + String.valueOf(tempBlockId)
+              + s", probability: " + String.valueOf(i._2))
               if(actualFreeMemory + resultSelectedMemory >= space) {
               break
             }
