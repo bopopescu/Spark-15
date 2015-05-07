@@ -100,16 +100,16 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
             val freqIndi = usages.size                         //how many times this block been accessed, as f.
             val expectedHitRate = 1.0 * (freqIndi - 1) / freqIndi    //expected maxisum ratio of hitrate, f-1/f.
 
-            val hitList = entries.hitMiss.getOrElse(blockId, new ArrayBuffer[Boolean]())
+            val hitList = entries.hitMiss.getOrElse(blockId, new ArrayBuffer[(Boolean, Long)]())
             var countHit = 0
             for(i <- 0 until hitList.size) {
-              if(hitList(i) == true){
+              if(hitList(i)._1 == true){
                 countHit = countHit + 1
               }
             }
-
             val hitListSize = if(hitList.size != 0) hitList.size else 1
-            val realHitRate = 1.0 * countHit / hitListSize
+            val realHitRate = (1.0 * countHit) / hitListSize
+            System.out.println("###############countHit: " + countHit + ", realHitRate: " + realHitRate)
             var hitMissRatio = 0.0
             if (expectedHitRate == 0) {
               hitMissRatio = 1

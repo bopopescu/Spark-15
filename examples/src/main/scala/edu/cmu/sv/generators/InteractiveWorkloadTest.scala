@@ -19,7 +19,7 @@ object InteractiveWorkloadTest {
   def main(args: Array[String]) {
   	
     val iterations = if (args.length > 0) args(0).toInt else ITERATIONS
-    val conf = new SparkConf().setAppName("Interactive Workload").setUseBayes("false")
+    val conf = new SparkConf().setAppName("Interactive Workload").setUseBayes("1")
     implicit val spark = new SparkContext(conf)
 
     if (args.length > 1 && args(1) == "trace") {
