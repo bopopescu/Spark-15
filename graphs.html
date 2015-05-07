@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.js"></script>
+<script>
+
+var margin = {top: 20, right: 20, bottom: 30, left: 50},
+    width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var x = d3.time.scale()
+    .range([0, width]);
+
+var y = d3.scale.linear()
+    .range([height, 0]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+
+var line = d3.svg.line()
+    .x(function(d) { return x(d.timeunit); })
+    .y(function(d) { return y(d.hitrate); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("hitRatePerTimeUnit.csv", function(error, data) {
+  data.forEach(function(d) {
+    d.timeunit = 100000 * +d.timeunit;
+    d.hitrate = +d.hitrate;
+  });
+
+  x.domain(d3.extent(data, function(d) { return d.timeunit; }));
+  y.domain(d3.extent(data, function(d) { return d.hitrate; }));
+
+  // todo: add chart name 
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0" + "," + height + ")")
+      .call(xAxis)
+    .append("text")
+      .attr("transform", "translate(" + width/2 + ",30)")
+      .text("Time (seconds)");
+
+  // todo: fix x axis units
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .attr("transform", "translate(-15," + height/2 + ")")
+      .style("text-anchor", "end")
+      .text("Hit Rate");
+
+   svg.append("path")
+      .datum(data)
+      .attr("class", "line")
+      .attr("d", line);
+
+   // todo: add points
+
+   // todo: add interpolation 
+
+});
+
+</script>
