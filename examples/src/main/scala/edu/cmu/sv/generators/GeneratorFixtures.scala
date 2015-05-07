@@ -7,7 +7,6 @@ import scala.util.Try
 import scala.collection.mutable.HashMap
 
 abstract class WorkloadGenerator extends java.io.Serializable {
-  val rdds = HashMap[Int, RDD[_]]()
   def generateWorkload(rddId:Int)(implicit spark:SparkContext): Double
 }
 
@@ -30,7 +29,13 @@ trait PiApproximation extends WorkloadGenerator {
 
 }
 
+object GoogleTraceTaskUsage {
+  val rdds = HashMap[Int, RDD[_]]()
+}
+
 trait GoogleTraceTaskUsage extends WorkloadGenerator {
+
+  import GoogleTraceTaskUsage._
 
   val nreads = 1
   val filepath = "/tmp/part-00000-of-00500.csv"
@@ -60,26 +65,23 @@ trait GoogleTraceTaskUsage extends WorkloadGenerator {
 
   private def generateRDD()(implicit spark:SparkContext):RDD[_] = {
         
-    val rdd = (1 to nreads).toList.foldLeft(spark.textFile(file)) { (r, i) =>    
+    val rdd = (1 to nreads).toList.foldLeft(spark.textFile(file)) { (r, i) =>
       val tmp = spark.textFile(file)
       r ++ tmp
     }
 
-    // val taskUsage = rdd.map(_.split(",")).flatMap(row => Try(TaskUsage(
-    //   row(0).toLong, row(1).toLong, row(2).toLong, row(3).toLong, row(4).toLong, row(5).toDouble, row(6).toDouble, row(7).toDouble, row(8).toDouble,
-    //   row(9).toDouble, row(10).toDouble, row(11).toDouble, row(12).toDouble, row(13).toDouble, row(14).toDouble, row(15).toDouble, row(16).toDouble,
-    //   row(17).toDouble, row(18).toDouble, row(19).toDouble)).toOption
-    // )
+    val taskUsage = rdd.map(_.split(",")).flatMap(row => Try(TaskUsage(
+      row(0).toLong, row(1).toLong, row(2).toLong, row(3).toLong, row(4).toLong, row(5).toDouble, row(6).toDouble, row(7).toDouble, row(8).toDouble,
+      row(9).toDouble, row(10).toDouble, row(11).toDouble, row(12).toDouble, row(13).toDouble, row(14).toDouble, row(15).toDouble, row(16).toDouble,
+      row(17).toDouble, row(18).toDouble, row(19).toDouble)).toOption
+    )
 
-    // taskUsage.cache()
-    // taskUsage
-    rdd.cache()
-    rdd
+    taskUsage.persist()    
   }
 
   def generateWorkload(rddId:Int)(implicit spark:SparkContext):Double = {
     val rdd = rdds.getOrElseUpdate(rddId, generateRDD)
-    // rdd.asInstanceOf[RDD[TaskUsage]].map(_.meanCPUUsageTime).mean()    
+    rdd.asInstanceOf[RDD[TaskUsage]].map(_.meanCPUUsageTime).mean()
     rdd.count()
   }
 

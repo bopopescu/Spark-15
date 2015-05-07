@@ -1,0 +1,52 @@
+<html>
+  
+  <head>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://dimplejs.org/dist/dimple.v2.1.2.min.js"></script>
+  </head>
+
+  <body>
+    <div id="chartContainer">      
+      <script type="text/javascript">
+        var svg = dimple.newSvg("#chartContainer", 590, 400);
+        d3.csv("HitRate.txt", function (csv_data) {
+          var nested_data = d3.nest()
+          .key(function(d) { 
+            return Math.round(parseInt(d.timestamp)/10000);
+          })
+          .rollup(function(d) { 
+            return {
+              count: d.length,
+              hits: d3.sum(d, function(g) {return g.hit; })
+            };
+          })
+          .entries(csv_data);
+
+          nested_data = nested_data.map(function(d) {
+            return {
+              time: d.key,
+              hitRate: d.values.hits/d.values.count
+            }
+          })
+
+          // alert(JSON.stringify(nested_data));
+
+          var myChart = new dimple.chart(svg, nested_data);
+          myChart.setBounds(60, 30, 505, 305);
+          var x = myChart.addCategoryAxis("x", "time");
+          x.addOrderRule("time");
+          myChart.addMeasureAxis("y", "hitRate");
+          var s = myChart.addSeries(null, dimple.plot.line);
+          s.interpolation = "cardinal";
+
+          myChart.addLegend(60, 10, 500, 20, "right");
+          myChart.draw();
+
+          
+        });    
+          
+      </script>
+    </div>
+  </body>
+
+</html>
