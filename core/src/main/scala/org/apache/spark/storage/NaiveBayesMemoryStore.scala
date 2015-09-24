@@ -2,7 +2,6 @@ package org.apache.spark.storage
 
 // scalastyle:off
 
-//import NaiveBayes._
 import edu.cmu.sv.naiveBayes._
 import scala.collection.mutable.{Map, LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer

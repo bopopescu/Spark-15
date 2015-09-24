@@ -20,8 +20,10 @@ object InteractiveWorkloadTest {
   def main(args: Array[String]) {
   	
     val iterations = if (args.length > 0) args(0).toInt else ITERATIONS
+    val algorithm = if (args.length > 3) args(3) else "0"
     val conf = new SparkConf().setAppName("Interactive Workload")
-      .setAlgorithm(""+ (if (args.length > 3) args(3).toInt else 0))
+      .setAlgorithm(algorithm)
+    System.setProperty("CMU_ALGORITHM_ENUM", algorithm)
     implicit val spark = new SparkContext(conf)
 
     if (args.length > 1 && args(1) == "trace") {
