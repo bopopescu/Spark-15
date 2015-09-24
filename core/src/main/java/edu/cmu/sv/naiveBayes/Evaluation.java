@@ -79,7 +79,7 @@ public class Evaluation {
                     }
                 }
 
-                bayesClassifier = (classifier) Class.forName("NaiveBayes." + clsName).newInstance();
+                bayesClassifier = new NaiveBayes();
                 bayesClassifier.train(isCategory, trainFeatures, trainLabels);
                 
                 if (option == 1) {
@@ -120,13 +120,7 @@ public class Evaluation {
                 // }
                 
                 
-            } catch (ClassNotFoundException ex) {
-                Logger.getLogger(Evaluation.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            catch (InstantiationException ex) {
-                Logger.getLogger(Evaluation.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            catch (IllegalAccessException ex) {
+            } catch (Exception ex) {
                 Logger.getLogger(Evaluation.class.getName()).log(Level.SEVERE, null, ex);
             }
         }        
