@@ -2,7 +2,6 @@ package org.apache.spark.storage
 
 // scalastyle:off
 
-import javaml._
 import NaiveBayes._
 import scala.collection.mutable.{Map, LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer
@@ -72,22 +71,16 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   val algorithm = java.lang.Integer.valueOf(System.getProperty("CMU_ALGORITHM_ENUM","0"))
   var dataset : DataSet = null
   var eva : Evaluation = null
-  var svm_classifier : Classifier = new LibSVM()
 
   //create the bayes classifier.
   if(algorithm == 1) {
     dataset = new DataSet("segment.data")
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
-  } else if (algorithm == 3) {
-    dataset = FileHandler.loadDataset(new File("segment.data"),4,",");
   }
   
   private val trainingDataGenerator = new CsvGenerator(entries)
   trainingDataGenerator.start
-
-  // SVM Training
-  svm_classifier.buildClassifier(dataset) 
 
   protected def findBlocksToReplace (
     entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
@@ -99,10 +92,8 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
 
     if(algorithm == 1) {
       naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-    } else if (algorithm == 2) {
+    } else if (algorithm == 2){
       rlFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
-    } else if (algorithm == 3) {
-      svm_FindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     } else {
       findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     }
@@ -150,7 +141,46 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
         }
       }
     }
-   
+    
+    //   entries.synchronized {
+    //     while (actualFreeMemory + resultSelectedMemory < space && entries.usage.toIterator.hasNext) {
+    //       var usageIterator = entries.usage.toIterator
+    //       if(usageIterator.hasNext) {
+    //         val (usageBlockId, blockUsage) = usageIterator.next()
+    //         var finalResult = usageBlockId
+    //         val lastAccess = blockUsage.last * 1.0 / System.currentTimeMillis()
+    //         var predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
+    //         logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+    //           + s" frequency:" + String.valueOf(blockUsage.size)
+    //           + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+    //           + s" last access rate:" + String.valueOf(blockUsage.last / System.currentTimeMillis())
+    //           + s" predict:" + String.valueOf(predict))
+
+    //         while(usageIterator.hasNext) {
+    //           val (usageTempBlockId, tempblockUsage) = usageIterator.next()
+    //           val templastAccess = tempblockUsage.last * 1.0 / System.currentTimeMillis()
+    //           val tempPredict = eva.predict(Array(tempblockUsage.size, entries.get(usageTempBlockId).size))
+    //           logInfo(s"BlockId:" + String.valueOf(usageTempBlockId) 
+    //           + s" frequency:" + String.valueOf(tempblockUsage.size)
+    //           + s" block size:" + String.valueOf(entries.get(usageTempBlockId).size)
+    //           + s" last access rate:" + String.valueOf(templastAccess) 
+    //           + s" predict:" + String.valueOf(tempPredict))
+    //           if(predict > tempPredict) {
+    //             predict = tempPredict
+    //             finalResult = usageTempBlockId
+    //           }
+    //         }
+    //         selectedBlocks += usageBlockId
+    //         resultSelectedMemory += entries.getNoUsage(usageBlockId).size
+    //         logInfo(s"Choose to drop Block: " + String.valueOf(usageBlockId)
+    //           + s" timeLine: " + String.valueOf(blockUsage.last)
+    //           + s" resultSelectedMemory: " + String.valueOf(resultSelectedMemory)
+    //           + s" freeMemory: " + String.valueOf(actualFreeMemory + resultSelectedMemory)
+    //           + s" space: " + String.valueOf(space)
+    //           + s" access frequency: " + String.valueOf(blockUsage.size));
+    //       }
+    //     }
+    //   }
     if(predictionCount == 10) {
       logInfo(s"retraining!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
       dataset.dataReset(entries.trainStructure, entries.label)
@@ -188,46 +218,36 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
             }
           }
         }
+        // val iterator = entries.usage.toIterator
+        // while(iterator.hasNext) {
+        //   val (usageBlockId, blockUsage) = iterator.next()
+        //   val predict = eva.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
+        //   tempMap.put(usageBlockId, predict)
+        //   logInfo(s"BlockId:" + String.valueOf(usageBlockId) 
+        //       + s" frequency:" + String.valueOf(blockUsage.size)
+        //       + s" block size:" + String.valueOf(entries.get(usageBlockId).size)
+        //       + s" predict:" + String.valueOf(predict))
+        // }
+        // val tempList = tempMap.toList.sortBy{_._2}
+        // breakable {
+        //   for(i <- tempList) {
+        //     val tempBlockId = i._1
+        //     selectedBlocks += tempBlockId
+        //     resultSelectedMemory += entries.getNoUsage(tempBlockId).size
+        //     logInfo(s"Choose to drop Block: " + String.valueOf(tempBlockId)
+        //       + s" resultSelectedMemory: " + String.valueOf(resultSelectedMemory)
+        //       + s" freeMemory: " + String.valueOf(actualFreeMemory + resultSelectedMemory)
+        //       + s" space: " + String.valueOf(space))
+        //     if(actualFreeMemory + resultSelectedMemory >= space) {
+        //       break
+        //     }
+        //   }
+        // }
       }
     }
     resultSelectedMemory
   }
   
-  private def svm_FindBlocksToReplace(
-    entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
-    actualFreeMemory: Long,
-    space: Long,
-    rddToAdd: Option[Int],
-    selectedBlocks: ArrayBuffer[BlockId],
-    selectedMemory: Long) : Long = {
-    
-      var resultSelectedMemory = selectedMemory
-      val tempMap = new LinkedHashMap[BlockId, Double]
-      synchronized {
-        entries.synchronized {
-          val iterator = entries.usage.toIterator
-          while(iterator.hasNext) {
-            val (usageBlockId, blockUsage) = iterator.next()
-            val predict = svm_classifier.predict(Array(blockUsage.size, entries.getNoUsage(usageBlockId).size))
-            tempMap.put(usageBlockId, predict)
-          }
-          val tempList = tempMap.toList.sortBy{_._2}
-          breakable {
-            for(i <- tempList) {
-              val tempBlockId = i._1
-              selectedBlocks += tempBlockId
-              resultSelectedMemory += entries.getNoUsage(tempBlockId).size
-              if(actualFreeMemory + resultSelectedMemory >= space) {
-                break
-              }
-            }
-          }
-        }
-    }
-
-    resultSelectedMemory
-  }
-
   private def findBlocksToReplaceOriginal (
     entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
     actualFreeMemory: Long,
