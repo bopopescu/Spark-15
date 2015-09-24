@@ -1,4 +1,4 @@
-package NaiveBayes;
+package edu.cmu.sv.naiveBayes;
 
 import java.util.Arrays;
 import java.util.Random;
@@ -120,7 +120,13 @@ public class Evaluation {
                 // }
                 
                 
-            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException ex) {
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(Evaluation.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            catch (InstantiationException ex) {
+                Logger.getLogger(Evaluation.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            catch (IllegalAccessException ex) {
                 Logger.getLogger(Evaluation.class.getName()).log(Level.SEVERE, null, ex);
             }
         }        

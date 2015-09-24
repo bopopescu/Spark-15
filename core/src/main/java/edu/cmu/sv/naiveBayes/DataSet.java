@@ -1,4 +1,4 @@
-package NaiveBayes;
+package edu.cmu.sv.naiveBayes;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;

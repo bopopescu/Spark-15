@@ -1,9 +1,4 @@
-package NaiveBayes;
-
-import java.util.ArrayList;
-
-import NaiveBayes.DataSet;
-import NaiveBayes.Evaluation;
+package edu.cmu.sv.naiveBayes;
 
 public class test {
 
