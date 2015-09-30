@@ -5,6 +5,7 @@ import org.apache.spark._
 import org.apache.spark.rdd._
 import scala.util.Try
 import scala.collection.mutable.HashMap
+import java.io.File
 
 abstract class WorkloadGenerator extends java.io.Serializable {
   def generateWorkload(rddId:Int)(implicit spark:SparkContext): Double
@@ -64,8 +65,12 @@ trait GoogleTraceTaskUsage extends WorkloadGenerator {
       sampledCPUUsage:Double)
 
   private def generateRDD()(implicit spark:SparkContext):RDD[_] = {
-        
+
     val rdd = (1 to nreads).toList.foldLeft(spark.textFile(file)) { (r, i) =>
+      if (!new File(filepath).exists()) {
+        val newFile = new File(filepath)
+        newFile.createNewFile()
+      }
       val tmp = spark.textFile(file)
       r ++ tmp
     }
