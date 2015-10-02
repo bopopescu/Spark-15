@@ -2,7 +2,10 @@ package org.apache.spark.storage
 
 // scalastyle:off
 
+
+//import NaiveBayes._
 import edu.cmu.sv.naiveBayes._
+import libsvm._
 import scala.collection.mutable.{Map, LinkedHashMap, ArrayBuffer}
 import java.nio.ByteBuffer
 import org.apache.spark.Logging
@@ -72,12 +75,14 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   var dataset : DataSet = null
   var eva : Evaluation = null
 
+  var numIterations = 10
+
   //create the bayes classifier.
   if(algorithm == 1) {
     dataset = new DataSet("segment.data")
     eva = new Evaluation(dataset, "NaiveBayes")
     eva.crossValidation(2)
-  }
+  } 
   
   private val trainingDataGenerator = new CsvGenerator(entries)
   trainingDataGenerator.start
@@ -94,6 +99,8 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
       naiveBayesFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     } else if (algorithm == 2){
       rlFindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
+    } else if (algorithm == 3) {
+      svm_FindBlocksToReplace(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     } else {
       findBlocksToReplaceOriginal(entries, actualFreeMemory, space, rddToAdd, selectedBlocks, selectedMemory)
     }
@@ -248,6 +255,116 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
     resultSelectedMemory
   }
   
+  private def svm_FindBlocksToReplace (
+    entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
+    actualFreeMemory: Long,
+    space: Long,
+    rddToAdd: Option[Int],
+    selectedBlocks: ArrayBuffer[BlockId],
+    selectedMemory: Long) : Long = {
+
+      // SVM Primitive definition and configuration
+      val data : DataSet = new DataSet("segment.data")
+      val prob : svm_problem = new svm_problem()
+      val param : svm_parameter = new svm_parameter()
+      val model : svm_model = new svm_model()
+
+      // SVM Problem or Data Input
+      val array_svm_node : ArrayBuffer[Array[svm_node]] = new ArrayBuffer[Array[svm_node]](0)
+
+      for (x <- 0 until data.features.size()) {
+          val node_1 : svm_node = new svm_node()
+          val node_2 : svm_node = new svm_node()
+
+          node_1.index = 0
+          node_1.value = data.features.get(x).get(0)
+
+          node_2.index = 1
+          node_2.value = data.features.get(x).get(1)
+
+          val node_col : Array[svm_node] = new Array[svm_node](2)
+          node_col(1) = node_1
+          node_col(2) = node_2
+
+          array_svm_node += node_col
+        }
+        
+        
+      
+
+      val array_svm_label : ArrayBuffer[Double] = new ArrayBuffer[Double]()
+
+      for (x <- 1 until data.labels.size()) {
+        array_svm_label += data.labels.get(x)
+      }
+
+      prob.x = array_svm_node.toArray
+      prob.y = array_svm_label.toArray
+      prob.l = data.getNumInstnaces()
+
+      param.svm_type = svm_parameter.C_SVC
+      param.kernel_type = svm_parameter.RBF
+      param.degree = 3
+      param.gamma = 0 // 1/num_features
+      param.coef0 = 0
+      param.nu = 0.5
+      param.cache_size = 100
+      param.C = 1
+      param.eps = 1e-3
+      param.p = 0.1
+      param.shrinking = 1
+      param.probability = 0
+      param.nr_weight = 0
+      param.weight_label  = new Array[Int](0)
+      param.weight = new Array[Double](0)
+
+      val model2 : svm_model = svm.svm_train(prob, param)
+      //svm.svm_save_model()
+
+      var resultSelectedMemory = selectedMemory
+      val tempMap = new LinkedHashMap[BlockId, Double]
+      synchronized {
+        entries.synchronized {
+          val iterator = entries.usage.toIterator
+          while (iterator.hasNext) {
+            val (usageBlockId, blockUsage) = iterator.next()
+
+            val node : svm_node = new svm_node()
+            node.index = 0
+            node.value = blockUsage.size
+
+            val node2 : svm_node = new svm_node()
+            node2.index = 1
+            node2.value = entries.getNoUsage(usageBlockId).size
+
+            val node_collection : Array[svm_node] = new Array[svm_node](2)
+            node_collection(1) = node
+            node_collection(2) = node2
+
+            val totalclass : Array[Double] = new Array[Double](10)
+            val prediction : Double = svm.svm_predict_probability(model, node_collection, totalclass)
+            tempMap.put(usageBlockId, prediction)
+          }
+
+          val tempList = tempMap.toList.sortBy{_._2}
+          breakable {
+            for (i <- tempList) {
+              val tempBlockId = i._1
+              selectedBlocks += tempBlockId
+              resultSelectedMemory += entries.getNoUsage(tempBlockId).size
+
+              if (actualFreeMemory + resultSelectedMemory >= space) {
+                  break
+              } 
+            }
+          }
+        }
+      }
+
+      return resultSelectedMemory
+    }
+  
+
   private def findBlocksToReplaceOriginal (
     entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
     actualFreeMemory: Long,
