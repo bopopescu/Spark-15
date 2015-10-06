@@ -12,7 +12,7 @@
       <script type="text/javascript">
         var svg = dimple.newSvg("#chartContainer", 590, 400);
         d3.csv("vizualize.csv", function (data) {
-          data = dimple.filterData(data, "jobName", ["Random Workload"])
+          data = dimple.filterData(data, "jobName", ["Interactive Workload", "Random Workload", "Iterative Workload"])
           var myChart = new dimple.chart(svg, data);
           myChart.setBounds(60, 30, 505, 305);
           var x = myChart.addCategoryAxis("x", "startNorm");
