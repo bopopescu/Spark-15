@@ -73,7 +73,7 @@ class CsvGenerator(entries:EnrichedLinkedHashMap[BlockId, MemoryEntry]) extends 
     // out_record.flush()
 
     breakable {
-      while(true) {
+      while(!Thread.interrupted()) {
 
         val jobName = java.lang.String.valueOf(System.getProperty("CMU_APP_NAME","default name"))
         val algorithm = java.lang.Integer.valueOf(System.getProperty("CMU_ALGORITHM_ENUM","0"))

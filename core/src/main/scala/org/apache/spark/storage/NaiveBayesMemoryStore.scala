@@ -87,6 +87,16 @@ private[spark] class NaiveBayesMemoryStore(blockManager: BlockManager, maxMemory
   private val trainingDataGenerator = new CsvGenerator(entries)
   trainingDataGenerator.start
 
+  override def clear() {
+    trainingDataGenerator.interrupt()
+    entries.synchronized {
+      entries.clear()
+      currentMemory = 0
+    }
+
+    logInfo("NaiveBayesMemoryStore cleared")
+  }
+
   protected def findBlocksToReplace (
     entries: EnrichedLinkedHashMap[BlockId, MemoryEntry],
     actualFreeMemory: Long,
